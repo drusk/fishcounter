@@ -13,42 +13,34 @@ def get_frame(videocapture):
 def main(videofile):
     # Initialize video stream
     cap = cv2.VideoCapture(videofile)
-
+    
     frame = get_frame(cap)
+    edge_img = cv2.Canny(frame, 40, 100)
     
-    avg1 = np.float32(frame)
-    avg2 = np.float32(frame)
-    
-    accum = np.float32(frame)
-    
+    bg = np.uint8(edge_img)
     num_bg_samples = 20
     for _ in xrange(num_bg_samples):
         frame = get_frame(cap)
-        cv2.accumulate(frame, accum)
-        
-    bg = cv2.convertScaleAbs(accum / float(num_bg_samples))
-    cv2.imshow("Background", bg)
+        edge_img = cv2.Canny(frame, 40, 100)
+        bg[edge_img.nonzero()] = 255
+    
+    cv2.imshow("BG", bg)
     while True:
         frame = get_frame(cap)
+        cv2.imshow("Original", frame)
         
-        fg = cv2.convertScaleAbs(bg - frame)
-#        cv2.accumulateWeighted(frame, avg1, 0.1)
-#        cv2.accumulateWeighted(frame, avg2, 0.01)
+        edge_img = cv2.Canny(frame, 40, 100)
+        cv2.imshow("Raw edges", edge_img)
         
-#        res1 = cv2.convertScaleAbs(avg1)
-#        res2 = cv2.convertScaleAbs(avg2)
-        
-        cv2.imshow('img',frame)
-        cv2.imshow("FG", fg)
-#        cv2.imshow('avg1',res1)
-#        cv2.imshow('avg2',res2)
+        edge_nobg = cv2.convertScaleAbs(edge_img - bg)
+        cv2.imshow("Edges no bg", edge_nobg) 
         
         key = cv2.waitKey(10)
         
         if key == 27:
             break
         if key == ord(" "):
-            cv2.imwrite("screenshot.jpg", frame)
+            cv2.imwrite("screenshot.jpg", edge_img)
 
 if __name__ == "__main__":
     main("data/fish_video.mp4")

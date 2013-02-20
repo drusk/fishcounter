@@ -1,21 +1,14 @@
 """
-Counts the number of fish that appear in a video segment.
+Try Gaussian smoothing before edge detection.
 """
 
 import cv2
+import numpy as np
 
 def get_frame(videocapture):
     # Read one frame of the video
     _, frame = videocapture.read()
-        
-    # Red channel seems to have the best contrast so grab it
-    _, _, redchannel = cv2.split(frame)
-        
-    # Histogram equalize to improve contrast further
-    # Actually, this doesn't look too great...
-    #return cv2.equalizeHist(redchannel)
-    
-    return redchannel
+    return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
 def main(videofile):
     # Initialize video stream
@@ -23,10 +16,13 @@ def main(videofile):
     
     while True:
         frame = get_frame(cap)
+        cv2.imshow("Original", frame)
+        smoothed = cv2.GaussianBlur(frame, (0, 0), 1)
         
-        edge_img = cv2.Canny(frame, 50, 80)
+        cv2.imshow("Smoothed", smoothed)
         
-        cv2.imshow("Video test", edge_img)
+        edge_img = cv2.Canny(smoothed, 40, 80)
+        cv2.imshow("Edges", edge_img)
         
         key = cv2.waitKey(10)
         
