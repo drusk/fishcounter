@@ -27,11 +27,15 @@ def main(videofile):
         cv2.accumulate(frame, accum)
         
     bg = cv2.convertScaleAbs(accum / float(num_bg_samples))
+    bgmean = bg.mean()
+    bgstd = bg.std()
+    
     cv2.imshow("Background", bg)
     while True:
         frame = get_frame(cap)
         
         fg = cv2.convertScaleAbs(bg - frame)
+        _, fgbin = cv2.threshold(fg, bgmean + bgstd, 255, cv2.THRESH_BINARY)
 #        cv2.accumulateWeighted(frame, avg1, 0.1)
 #        cv2.accumulateWeighted(frame, avg2, 0.01)
         
@@ -40,6 +44,7 @@ def main(videofile):
         
         cv2.imshow('img',frame)
         cv2.imshow("FG", fg)
+        cv2.imshow("FG bin", fgbin)
 #        cv2.imshow('avg1',res1)
 #        cv2.imshow('avg2',res2)
         
