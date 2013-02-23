@@ -27,7 +27,34 @@ def draw_flow(im,flow,step=16):
 def segment_by_velocity(im, flow, l_thresh=1.5, n=30):
     mag = np.sum(np.fabs(flow), 2)
     mag[mag < l_thresh] = 0
-    print np.max(mag)
+
+    _, magbin = cv2.threshold(mag, l_thresh, 255, cv2.THRESH_BINARY)
+    magbin = magbin.astype(np.uint8)
+    contours, _ = cv2.findContours(magbin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contour_img = np.zeros(magbin.shape)
+    
+    boxed_img = im.copy()
+    boxed_gray = cv2.cvtColor(boxed_img, cv2.COLOR_BGR2GRAY)
+    for i in xrange(len(contours)):
+        area = cv2.contourArea(contours[i])
+        if area > 3000:
+            cv2.drawContours(contour_img, contours, i, 255)
+
+            x, y, width, height = cv2.boundingRect(contours[i])
+            
+            sub_img = boxed_gray[y:y+height, x:x+width]
+            cv2.imshow("Sub img", sub_img)
+            
+            features = cv2.goodFeaturesToTrack(sub_img, 5, 0.5, 1)
+            for pt in features:
+                cv2.circle(boxed_img, (int(pt[0][0]) + x, int(pt[0][1]) + y), 7, (255, 0, 0))
+            break
+
+    cv2.imshow("Contours", contour_img)
+    
+    cv2.imshow("Bounded", boxed_img)
+    
+#    print np.max(mag)
     kernel = np.ones((n,n))
     mag_accum = correlate(mag, kernel)
     return mag_accum > n*n
@@ -42,7 +69,7 @@ cap = cv2.VideoCapture(VIDEO)
 ret,im = cap.read()
 prev_gray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
 
-skip = 230
+skip = 950
 while True:
     ret,im = cap.read()
     if skip > 0:
