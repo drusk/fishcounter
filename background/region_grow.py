@@ -4,6 +4,20 @@ from scipy.ndimage.filters import correlate
 
 VIDEO = "data/fish_video.mp4"
 
+class Fish(object):
+    
+    def __init__(self, control_pts):
+        self.control_pts = control_pts
+        
+    def in_region(self, contour):
+        hits = 0
+        for (x, y) in self.control_pts:
+            if cv2.pointPolygonTest(contour, (x, y), False):
+                hits += 1
+        
+        # do majority vote of points
+        return hits > len(self.control_pts) / 2
+
 def draw_flow(im,flow,step=16):
     """ Plot optical flow at sample points spaced step pixels apart. """
     h,w = im.shape[:2]
@@ -39,73 +53,29 @@ def segment_by_velocity(img, flow, l_thresh=1.5):
         
     return large_contours
 
-def get_control_pts(im, contours):
-    boxed_img = im.copy()
-    boxed_gray = cv2.cvtColor(boxed_img, cv2.COLOR_BGR2GRAY)
+def get_control_pts(im, contour):
+    boxed_gray = im.copy()
     
-    for contour in contours:
-        x, y, width, height = cv2.boundingRect(contour)
+    x, y, width, height = cv2.boundingRect(contour)
             
-        sub_img = boxed_gray[y:y+height, x:x+width]
+    sub_img = boxed_gray[y:y+height, x:x+width]
     
-    cv2.imshow("Sub img", sub_img)
-            
     features = cv2.goodFeaturesToTrack(sub_img, 5, 0.5, 1)
-    pts = []
-    for pt in features:
+    
+    # Get the points back in the coordinates of the original image
+    normalized_pts = []
+    for pt in features:        
         normalized_pt = (int(pt[0][0]) + x, int(pt[0][1]) + y)
-        cv2.circle(boxed_img, normalized_pt, 7, (255, 0, 0))
-        pts.append(normalized_pt)
+        normalized_pts.append(normalized_pt)
+    
+    return np.array(normalized_pts, dtype=np.float32)
+
+def draw_frame_with_tracked_pts(im, fishes):
+    for fish in fishes:
+        for (x, y) in fish.control_pts:
+            cv2.circle(im, (int(x), int(y)), 7, (255, 0, 0))
         
-    cv2.imshow("Boxed img", boxed_img)
-    return pts
-
-def segment_by_velocity2(im, flow, l_thresh=1.5, n=30):
-    mag = np.sum(np.fabs(flow), 2)
-    mag[mag < l_thresh] = 0
-
-    _, magbin = cv2.threshold(mag, l_thresh, 255, cv2.THRESH_BINARY)
-    magbin = magbin.astype(np.uint8)
-    contours, _ = cv2.findContours(magbin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    contour_img = np.zeros(magbin.shape)
-    
-    large_contours = []
-    boxed_img = im.copy()
-    boxed_gray = cv2.cvtColor(boxed_img, cv2.COLOR_BGR2GRAY)
-    for contour in contours:
-        area = cv2.contourArea(contour)
-        if area > 3000:
-            large_contours.append(contour)
-            
-    for i in xrange(len(contours)):
-        area = cv2.contourArea(contours[i])
-        if area > 3000:
-            large_contours.append(contours[i])
-            cv2.drawContours(contour_img, contours, i, 255)
-
-            x, y, width, height = cv2.boundingRect(contours[i])
-            
-            sub_img = boxed_gray[y:y+height, x:x+width]
-            cv2.imshow("Sub img", sub_img)
-            
-            features = cv2.goodFeaturesToTrack(sub_img, 5, 0.5, 1)
-            for pt in features:
-                cv2.circle(boxed_img, (int(pt[0][0]) + x, int(pt[0][1]) + y), 7, (255, 0, 0))
-            break
-
-    cv2.imshow("Contours", contour_img)
-    
-    cv2.imshow("Bounded", boxed_img)
-    
-#    print np.max(mag)
-    kernel = np.ones((n,n))
-    mag_accum = correlate(mag, kernel)
-    return mag_accum > n*n
-
-def draw_region(im, regions):
-    vis = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
-    vis[regions] = (255,0,0)
-    return vis
+    cv2.imshow("Frame", im)
 
 # setup video capture
 cap = cv2.VideoCapture(VIDEO)
@@ -114,6 +84,8 @@ prev_gray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
 
 skip = 950
 
+fishes = []
+
 while True:
     ret,im = cap.read()
     if skip > 0:
@@ -121,20 +93,37 @@ while True:
         continue
     gray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
 
+    # Update fish control points
+#    import pdb; pdb.set_trace()
+    for fish in fishes:
+#        print fish.control_pts
+        fish.control_pts, _, _ = cv2.calcOpticalFlowPyrLK(prev_gray, gray, fish.control_pts, None)
+
     # compute flow
     flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+    contours = segment_by_velocity(gray, flow)
+    
+    # Find contours that are new fishes
+    untracked_contours = []
+    for contour in contours:
+        add_to_list = True
+        for fish in fishes:
+            if fish.in_region(contour):
+                add_to_list = False
+        if add_to_list:
+            untracked_contours.append(contour)
+    
+    for contour in untracked_contours:
+        control_pts = get_control_pts(gray, contour)
+        fishes.append(Fish(control_pts))
+
     prev_gray = gray
-
     
-
-    contours = segment_by_velocity(im, flow)
-    control_pts = get_control_pts(im, contours)
+    draw_frame_with_tracked_pts(im, fishes)
     
-#    regions = segment_by_velocity2(im, flow)
+    print "Number of fish: %d" % len(fishes)
 
-    # plot the flow vectors
-    #cv2.imshow('Optical flow', draw_flow(gray,flow))
-#    cv2.imshow('Optical flow', draw_region(gray,regions))
     if cv2.waitKey(10) == 27:
         break
 
