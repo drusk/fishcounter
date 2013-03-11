@@ -53,38 +53,31 @@ def segment_by_velocity(img, flow, l_thresh=1.5):
         
     return large_contours
 
-def get_control_pts(im, contour):
-    boxed_gray = im.copy()
-    
+def get_control_pts(img, contour):
     x, y, width, height = cv2.boundingRect(contour)
             
-    sub_img = boxed_gray[y:y+height, x:x+width]
-    
+    sub_img = img[y:y+height, x:x+width]
     features = cv2.goodFeaturesToTrack(sub_img, 5, 0.5, 1)
     
     if features is None:
         return None
     
     # Get the points back in the coordinates of the original image
-    normalized_pts = []
+    norm_pts = [(int(pt[0][0]) + x, int(pt[0][1]) + y) for pt in features]
     
-    for pt in features:
-        normalized_pt = (int(pt[0][0]) + x, int(pt[0][1]) + y)
-        normalized_pts.append(normalized_pt)
-    
-    return np.array(normalized_pts, dtype=np.float32)
+    return np.array(norm_pts, dtype=np.float32)
 
-def draw_frame_with_tracked_pts(im, fishes):
+def draw_frame_with_tracked_pts(img, fishes):
     for fish in fishes:
         for (x, y) in fish.control_pts:
-            cv2.circle(im, (int(x), int(y)), 7, (255, 0, 0))
+            cv2.circle(img, (int(x), int(y)), 7, (255, 0, 0))
         
-    cv2.imshow("Frame", im)
+    cv2.imshow("Frame", img)
 
 # setup video capture
 cap = cv2.VideoCapture(VIDEO)
-ret,im = cap.read()
-prev_gray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+ret, img = cap.read()
+prev_gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 skip = 950
 
