@@ -12,7 +12,7 @@ class Fish(object):
     def in_region(self, contour):
         hits = 0
         for (x, y) in self.control_pts:
-            if cv2.pointPolygonTest(contour, (x, y), False):
+            if cv2.pointPolygonTest(contour, (x, y), False) >= 0:
                 hits += 1
         
         # do majority vote of points
@@ -62,9 +62,13 @@ def get_control_pts(im, contour):
     
     features = cv2.goodFeaturesToTrack(sub_img, 5, 0.5, 1)
     
+    if features is None:
+        return None
+    
     # Get the points back in the coordinates of the original image
     normalized_pts = []
-    for pt in features:        
+    
+    for pt in features:
         normalized_pt = (int(pt[0][0]) + x, int(pt[0][1]) + y)
         normalized_pts.append(normalized_pt)
     
@@ -96,7 +100,6 @@ while True:
     # Update fish control points
 #    import pdb; pdb.set_trace()
     for fish in fishes:
-#        print fish.control_pts
         fish.control_pts, _, _ = cv2.calcOpticalFlowPyrLK(prev_gray, gray, fish.control_pts, None)
 
     # compute flow
@@ -116,11 +119,17 @@ while True:
     
     for contour in untracked_contours:
         control_pts = get_control_pts(gray, contour)
-        fishes.append(Fish(control_pts))
+        if control_pts is not None:
+            fishes.append(Fish(control_pts))
 
     prev_gray = gray
     
     draw_frame_with_tracked_pts(im, fishes)
+    
+    # Debugging - draw contours
+    tmp = gray.copy()
+    cv2.drawContours(tmp, contours, -1, 255)
+    cv2.imshow("Contours", tmp)
     
     print "Number of fish: %d" % len(fishes)
 
