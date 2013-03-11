@@ -39,10 +39,10 @@ def draw_flow(im,flow,step=16):
     return vis
 
 def segment_by_velocity(img, flow, l_thresh=1.5):
-    mag = np.sum(np.fabs(flow), 2)
-    mag[mag < l_thresh] = 0
+    mag = np.sum(np.fabs(flow), axis=2)
     _, magbin = cv2.threshold(mag, l_thresh, 255, cv2.THRESH_BINARY)
     magbin = magbin.astype(np.uint8)
+    
     contours, _ = cv2.findContours(magbin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     
     large_contours = []
