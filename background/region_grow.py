@@ -43,6 +43,10 @@ def segment_by_velocity(img, flow, l_thresh=1.5):
     _, magbin = cv2.threshold(mag, l_thresh, 255, cv2.THRESH_BINARY)
     magbin = magbin.astype(np.uint8)
     
+    # Apply morphological closing to combine pieces of same fish
+    kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (35, 35))
+    magbin = cv2.morphologyEx(magbin, cv2.MORPH_CLOSE, kernel)
+    
     contours, _ = cv2.findContours(magbin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     
     large_contours = []
@@ -84,11 +88,11 @@ skip = 950
 fishes = []
 
 while True:
-    ret,im = cap.read()
+    ret, img = cap.read()
     if skip > 0:
         skip -= 1
         continue
-    gray = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+    gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
     # Update fish control points
 #    import pdb; pdb.set_trace()
@@ -117,7 +121,7 @@ while True:
 
     prev_gray = gray
     
-    draw_frame_with_tracked_pts(im, fishes)
+    draw_frame_with_tracked_pts(img, fishes)
     
     # Debugging - draw contours
     tmp = gray.copy()
