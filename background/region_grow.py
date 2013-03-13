@@ -38,7 +38,7 @@ def draw_flow(im,flow,step=16):
 
     return vis
 
-def segment_by_velocity(img, flow, l_thresh=1.5):
+def segment_by_velocity(flow, l_thresh=1.5, min_frame_portion=0.025):
     mag = np.sum(np.fabs(flow), axis=2)
     _, magbin = cv2.threshold(mag, l_thresh, 255, cv2.THRESH_BINARY)
     magbin = magbin.astype(np.uint8)
@@ -49,10 +49,13 @@ def segment_by_velocity(img, flow, l_thresh=1.5):
     
     contours, _ = cv2.findContours(magbin, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     
+    frameshape = np.shape(flow)
+    framesize = frameshape[0] * frameshape[1]
+    
     large_contours = []
     for contour in contours:
         area = cv2.contourArea(contour)
-        if area > 3000:
+        if area > min_frame_portion * framesize:
             large_contours.append(contour)
         
     return large_contours
@@ -81,6 +84,7 @@ def draw_frame_with_tracked_pts(img, fishes):
 # setup video capture
 cap = cv2.VideoCapture(VIDEO)
 ret, img = cap.read()
+
 prev_gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 skip = 950
@@ -102,7 +106,7 @@ while True:
     # compute flow
     flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
 
-    contours = segment_by_velocity(gray, flow)
+    contours = segment_by_velocity(flow)
     
     # Find contours that are new fishes
     untracked_contours = []
