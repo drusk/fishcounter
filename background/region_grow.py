@@ -72,7 +72,15 @@ def get_control_pts(img, contour):
         return None
     
     # Get the points back in the coordinates of the original image
-    norm_pts = [(int(pt[0][0]) + x, int(pt[0][1]) + y) for pt in features]
+    # while also filtering out those which are not within the contour
+    norm_pts = []
+    for pt in features:
+        norm_pt = (int(pt[0][0]) + x, int(pt[0][1]) + y)
+        if cv2.pointPolygonTest(contour, norm_pt, False) >= 0:
+            norm_pts.append(norm_pt)
+    
+    if len(norm_pts) == 0:
+        return None
     
     return np.array(norm_pts, dtype=np.float32)
 
