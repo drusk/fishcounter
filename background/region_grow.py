@@ -7,8 +7,9 @@ VIDEO = "data/fish_video.mp4"
 
 class Fish(object):
     
-    def __init__(self, control_pts):
+    def __init__(self, control_pts, contour):
         self.control_pts = control_pts
+        self.contour = contour
         
     def in_region(self, contour):
         hits = 0
@@ -19,6 +20,12 @@ class Fish(object):
         # do majority vote of points
         return hits > len(self.control_pts) / 2
 
+class MergedFish(Fish):
+    
+    def __init__(self, control_pts, contour, children):
+        super(MergedFish, self).__init__(control_pts, contour)
+        self.children = children
+        
 
 def draw_flow(im,flow,step=16):
     """ Plot optical flow at sample points spaced step pixels apart. """
@@ -101,15 +108,14 @@ ret, img = cap.read()
 
 prev_gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
-skip = 950
+skip = 1150
 
 fishes = []
 
 while True:
     ret, img = cap.read()
-    if skip > 0:
-        skip -= 1
-        continue
+    skip -= 1
+
     gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
     # Update fish control points
@@ -136,24 +142,41 @@ while True:
     
     # Find contours that are new fishes
     untracked_contours = []
+    
+    fishes_to_add = []
+    fishes_to_delete = []
     for contour in contours:
-        add_to_list = True
+        fishes_in_contour = []
         for fish in fishes:
             if fish.in_region(contour):
-                add_to_list = False
-        if add_to_list:
-            untracked_contours.append(contour)
+                # Update fish contour
+                fish.contour = contour
+                fishes_in_contour.append(fish)
+                
+        # Fish has not been tracked
+        if not fishes_in_contour:
+            control_pts = get_control_pts(gray, contour)
+            if control_pts is not None:
+                fishes_to_add.append(Fish(control_pts, contour))
+
+        # Multiple fish have overlapped                
+        elif len(fishes_in_contour) >= 1:
+            control_pts = get_control_pts(gray, contour)
+            if control_pts is not None:
+                fishes_to_delete.extend(fishes_in_contour)
+                merged_fish = MergedFish(control_pts, contour, fishes_in_contour)
+                fishes_to_add.append(merged_fish)
     
-    for contour in untracked_contours:
-        control_pts = get_control_pts(gray, contour)
-        if control_pts is not None:
-            fishes.append(Fish(control_pts))
+    fishes = [f for f in fishes if f not in fishes_to_delete]
+    fishes.extend(fishes_to_add)
 
     prev_gray = gray
     
-    draw_debug_frame(img, fishes, contours)
+    print skip
+    if skip < 0:
+        draw_debug_frame(img, fishes, contours)
+        print "Number of fish: %d" % len(fishes)
     
-    print "Number of fish: %d" % len(fishes)
 
     if cv2.waitKey(10) == 27:
         break
