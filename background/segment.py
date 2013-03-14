@@ -27,7 +27,7 @@ def hysteresis_thresh(img, thresh_low, thresh_high):
         if (segmented == prev_segmented).all():
             has_changed = False
             
-        prev_segmented = segmented.copy()
+        prev_segmented[:] = segmented
 
     return segmented
     
