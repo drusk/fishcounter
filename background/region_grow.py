@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-from scipy.ndimage.filters import correlate
+
+import segment
 
 VIDEO = "data/fish_video.mp4"
 
@@ -18,6 +19,7 @@ class Fish(object):
         # do majority vote of points
         return hits > len(self.control_pts) / 2
 
+
 def draw_flow(im,flow,step=16):
     """ Plot optical flow at sample points spaced step pixels apart. """
     h,w = im.shape[:2]
@@ -28,7 +30,7 @@ def draw_flow(im,flow,step=16):
     lines = np.vstack([x,y,x+fx,y+fy]).T.reshape(-1,2,2)
     lines = np.int32(lines)
 
-    lines = [((x1,y1),(x2,y2)) for ((x1,y1),(x2,y2)) in lines if abs(x1-x2) + abs(x1-x2) > 2 ]
+    lines = [((x1,y1),(x2,y2)) for ((x1,y1),(x2,y2)) in lines if abs(x1-x2) + abs(y1-y2) > 1 ]
 
     # create image and draw
     vis = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
@@ -104,9 +106,21 @@ while True:
         fish.control_pts, _, _ = cv2.calcOpticalFlowPyrLK(prev_gray, gray, fish.control_pts, None)
 
     # compute flow
-    flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+    flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 
+                    0.5, # pyramid scale - each layer is half previous size
+                    3, # number of pyramid levels
+                    35, # averaging window size
+                    3, # iterations at each pyramid level
+                    5, # size of the pixel neighbourhood used to find 
+                       # polynomial expansion in each pixel
+                    1.1, # standard deviation of the Gaussian that is used to 
+                         # smooth derivatives used as a basis for the 
+                         # polynomial expansion                         
+                    0 # additional flags
+                    )
 
-    contours = segment_by_velocity(flow)
+#    contours = segment_by_velocity(flow)
+    contours = segment.segment_by_velocity(flow, 0.5, 1.5)
     
     # Find contours that are new fishes
     untracked_contours = []
@@ -131,6 +145,9 @@ while True:
     tmp = gray.copy()
     cv2.drawContours(tmp, contours, -1, 255)
     cv2.imshow("Contours", tmp)
+    
+#    tmp2 = draw_flow(gray, flow)
+#    cv2.imshow("Flow", tmp2)
     
     print "Number of fish: %d" % len(fishes)
 

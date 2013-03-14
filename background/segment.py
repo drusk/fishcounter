@@ -7,6 +7,29 @@ import numpy as np
 
 MAX_PIXEL_VAL = 255
 
+def segment_by_velocity(flow, thresh_low, thresh_high, min_frame_portion=0.025):
+    flow_mag = np.sum(np.fabs(flow), axis=2)
+    
+    segmented_flow = hysteresis_thresh(flow_mag, thresh_low, thresh_high)
+    
+    # Apply morphological closing to combine pieces of the same object
+    # kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (35, 35))
+    # segmented_flow = cv2.morphologyEx(segmented_flow, cv2.MORPH_CLOSE, kernel)
+    
+    contours, _ = cv2.findContours(segmented_flow, cv2.RETR_TREE, 
+                                   cv2.CHAIN_APPROX_SIMPLE)
+    
+    frameshape = np.shape(flow)
+    framesize = frameshape[0] * frameshape[1]
+    
+    large_contours = []
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        if area > min_frame_portion * framesize:
+            large_contours.append(contour)
+        
+    return large_contours
+
 def hysteresis_thresh(img, thresh_low, thresh_high):
     # Initial segmentation based on the high threshold.  We have high 
     # confidence these are part of the object.
