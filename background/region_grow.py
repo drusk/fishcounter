@@ -84,12 +84,16 @@ def get_control_pts(img, contour):
     
     return np.array(norm_pts, dtype=np.float32)
 
-def draw_frame_with_tracked_pts(img, fishes):
+def draw_debug_frame(img, fishes, current_contours):
+    debug_img = img.copy()
+    
     for fish in fishes:
         for (x, y) in fish.control_pts:
-            cv2.circle(img, (int(x), int(y)), 7, (255, 0, 0))
-        
-    cv2.imshow("Frame", img)
+            cv2.circle(debug_img, (int(x), int(y)), 7, (0, 0, 255))
+    
+    cv2.drawContours(debug_img, contours, -1, 255)
+    
+    cv2.imshow("Debug", debug_img)
 
 # setup video capture
 cap = cv2.VideoCapture(VIDEO)
@@ -127,8 +131,8 @@ while True:
                     0 # additional flags
                     )
 
-#    contours = segment_by_velocity(flow)
-    contours = segment.segment_by_velocity(flow, 0.5, 1.5)
+    contours = segment_by_velocity(flow)
+#    contours = segment.segment_by_velocity(flow, 0.5, 1.5)
     
     # Find contours that are new fishes
     untracked_contours = []
@@ -147,15 +151,7 @@ while True:
 
     prev_gray = gray
     
-    draw_frame_with_tracked_pts(img, fishes)
-    
-    # Debugging - draw contours
-    tmp = gray.copy()
-    cv2.drawContours(tmp, contours, -1, 255)
-    cv2.imshow("Contours", tmp)
-    
-#    tmp2 = draw_flow(gray, flow)
-#    cv2.imshow("Flow", tmp2)
+    draw_debug_frame(img, fishes, contours)
     
     print "Number of fish: %d" % len(fishes)
 
