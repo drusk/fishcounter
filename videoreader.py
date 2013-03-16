@@ -14,12 +14,16 @@ class VideoReader(object):
         self.capture = cv2.VideoCapture(video_path)
         self.video_analyzer = video_analyzer
         
-    def start(self):
+    def start(self, skip=0):
         frame_was_read, current_image = self.capture.read()
         
         while frame_was_read:
             previous_image = current_image
             frame_was_read, current_image = self.capture.read()
+            
+            if skip > 0:
+                skip -= 1
+                continue
             
             self.video_analyzer.analyze(previous_image, current_image)
             
@@ -38,4 +42,4 @@ class FrameDisplayAnalyzer(object):
     
 
 if __name__ == "__main__":
-    VideoReader("data/fish_video.mp4", FrameDisplayAnalyzer()).start()
+    VideoReader("data/fish_video.mp4", FrameDisplayAnalyzer()).start(skip=500)
