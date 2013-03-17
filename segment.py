@@ -61,13 +61,6 @@ class CompositeSegmentationAlgorithm(object):
         segmentation1 = self.algorithm1.segment(current_image)
         segmentation2 = self.algorithm2.segment(current_image)
         
-        cv2.imshow("Moving average", segmentation1)
-        cv2.imshow("MOG", segmentation2)
-        
         # perform 'AND' operation
-        segmented = segmentation1 & segmentation2
-        
-        cv2.imshow("ANDED", segmented)
-        
-        return segmented
+        return segmentation1 & segmentation2
 

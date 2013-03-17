@@ -26,7 +26,7 @@ class VideoReader(object):
                 continue
             
             self.video_analyzer.analyze(previous_image, current_image)
-            
+            cv2.imshow("original", current_image)
             # Exit if user presses the Escape key
             if cv2.waitKey(10) == 27:
                 break

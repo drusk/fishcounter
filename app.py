@@ -5,6 +5,7 @@ Main module of the application performing fish counting.
 from segment import (CompositeSegmentationAlgorithm, 
                      MovingAverageBackgroundSubtractor,
                      MixtureOfGaussiansBackgroundSubtractor)
+from tracking import CamShiftTracker
 from videoanalyzer import Analyzer
 from videoreader import VideoReader
 
@@ -12,7 +13,8 @@ def run(video_path):
     segmenter = CompositeSegmentationAlgorithm(
                     MovingAverageBackgroundSubtractor(0.05),
                     MixtureOfGaussiansBackgroundSubtractor())
-    analyzer = Analyzer(segmenter)
+    tracker = CamShiftTracker()
+    analyzer = Analyzer(segmenter, tracker)
     VideoReader(video_path, analyzer).start()
 
 if __name__ == "__main__":
