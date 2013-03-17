@@ -2,13 +2,18 @@
 Main module of the application performing fish counting.
 """
 
-import segment
-import videoanalyzer
-import videoreader
+from segment import (CompositeSegmentationAlgorithm, 
+                     MovingAverageBackgroundSubtractor,
+                     MixtureOfGaussiansBackgroundSubtractor)
+from videoanalyzer import Analyzer
+from videoreader import VideoReader
 
 def run(video_path):
-    analyzer = videoanalyzer.Analyzer(segment.MovingAverageBackgroundSubtractor(0.05)) 
-    videoreader.VideoReader(video_path, analyzer).start()
+    segmenter = CompositeSegmentationAlgorithm(
+                    MovingAverageBackgroundSubtractor(0.05),
+                    MixtureOfGaussiansBackgroundSubtractor())
+    analyzer = Analyzer(segmenter)
+    VideoReader(video_path, analyzer).start()
 
 if __name__ == "__main__":
     run("data/fish_video.mp4")

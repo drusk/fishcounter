@@ -49,3 +49,26 @@ class MixtureOfGaussiansBackgroundSubtractor(object):
         grayscale = cv2.cvtColor(current_image, cv2.COLOR_BGR2GRAY)
         learning_rate = -1 # > 0 and < 1; -1 for automatically calculated value
         return self.background_subtractor.apply(grayscale, None, learning_rate)
+
+
+class CompositeSegmentationAlgorithm(object):
+    
+    def __init__(self, algorithm1, algorithm2):
+        self.algorithm1 = algorithm1
+        self.algorithm2 = algorithm2
+        
+    def segment(self, current_image):
+        segmentation1 = self.algorithm1.segment(current_image)
+        segmentation2 = self.algorithm2.segment(current_image)
+        
+        cv2.imshow("Moving average", segmentation1)
+        cv2.imshow("MOG", segmentation2)
+        
+        # perform 'AND' operation - avoiding overflow of uint8 datatype
+        segmented = ((segmentation1 / MAX_PIXEL_VALUE) * 
+                     (segmentation2 / MAX_PIXEL_VALUE) * MAX_PIXEL_VALUE)
+        
+        cv2.imshow("ANDED", segmented)
+        
+        return segmented
+
