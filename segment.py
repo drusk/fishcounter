@@ -64,9 +64,8 @@ class CompositeSegmentationAlgorithm(object):
         cv2.imshow("Moving average", segmentation1)
         cv2.imshow("MOG", segmentation2)
         
-        # perform 'AND' operation - avoiding overflow of uint8 datatype
-        segmented = ((segmentation1 / MAX_PIXEL_VALUE) * 
-                     (segmentation2 / MAX_PIXEL_VALUE) * MAX_PIXEL_VALUE)
+        # perform 'AND' operation
+        segmented = segmentation1 & segmentation2
         
         cv2.imshow("ANDED", segmented)
         
