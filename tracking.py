@@ -47,9 +47,3 @@ class CamShiftTracker(object):
         cv2.imshow("Tracker", debug_img)
             
     
-class BoundingBoxTracker(object):
-    
-    def __init__(self):
-        pass
-    
-    
