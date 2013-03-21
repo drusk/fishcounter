@@ -1,21 +1,25 @@
 """
 Main module of the application performing fish counting.
 """
+import sys
 
 from segment import (CompositeSegmentationAlgorithm, 
                      MovingAverageBackgroundSubtractor,
                      MixtureOfGaussiansBackgroundSubtractor)
-from tracking import BoundingBoxTracker
+from tracking import BoundingBoxTracker, CamShiftTracker
 from videoanalyzer import Analyzer
 from videoreader import VideoReader
 
-def run(video_path):
+def run(video_path, skip=0):
     segmenter = CompositeSegmentationAlgorithm(
                     MovingAverageBackgroundSubtractor(0.05),
                     MixtureOfGaussiansBackgroundSubtractor())
     tracker = BoundingBoxTracker()
     analyzer = Analyzer(segmenter, tracker)
-    VideoReader(video_path, analyzer).start()
+    VideoReader(video_path, analyzer).start(skip)
 
 if __name__ == "__main__":
-    run("data/fish_video.mp4")
+    skip = 0
+    if len(sys.argv) == 2:
+        skip = int(sys.argv[1])
+    run("data/fish_video.mp4", skip)
