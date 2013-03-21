@@ -11,6 +11,9 @@ class CamShiftTracker(object):
     https://code.ros.org/trac/opencv/browser/trunk/opencv/samples/python2/camshift.py?rev=6588
     """
     
+    def __init__(self):
+        self.tracked_objects = []
+        
     def update(self, current_image, contours):
         hsv = cv2.cvtColor(current_image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, np.array((0., 60., 32.)), 
@@ -45,5 +48,85 @@ class CamShiftTracker(object):
                            (255, 0, 0))
             
         cv2.imshow("Tracker", debug_img)
+
+class BoundingBox(object):
+    
+    def __init__(self, x0, y0, width, height):
+        self.x0 = x0
+        self.y0 = y0
+        self.width = width
+        self.height = height
+        
+    @property
+    def x1(self):
+        return self.x0 + self.width
+    
+    @property
+    def y1(self):
+        return self.y0 + self.height
+        
+    @property
+    def center(self):
+        return (self.x0 + self.width / 2, self.y0 + self.height / 2)
+    
+    @property
+    def top_left(self):
+        return (self.x0, self.y0)
+    
+    @property
+    def bottom_right(self):
+        return (self.x1, self.y1)
+    
+    def contains_point(self, point):
+        return (point[0] >= self.x0 and point[0] <= self.x1 and
+                point[1] >= self.y0 and point[1] <= self.y1)
+        
+    def update(self, bbox):
+        self.x0 = bbox.x0
+        self.y0 = bbox.y0
+        self.width = bbox.width
+        self.height = bbox.height
+
+
+class BoundingBoxTracker(object):
+    
+    def __init__(self):
+        self.tracked_objects = []
+        
+    def draw_tracked_bounding_boxes(self, img):
+        for bbox in self.tracked_objects:
+            cv2.rectangle(img, bbox.top_left, bbox.bottom_right, (255, 0, 0))
+        
+        cv2.imshow("Tracker", img)
+        
+    def _find_matching_objects(self, bbox):
+        matches = []
+        for obj in self.tracked_objects:
+            if obj.contains_point(bbox.center):
+                matches.append(obj)
+        return matches
+        
+    def update(self, current_image, contours):
+        for contour in contours:
+            bounding_rect = cv2.boundingRect(contour)
+            bbox = BoundingBox(*bounding_rect)
+            
+            matches = self._find_matching_objects(bbox)
+            
+            if len(matches) == 0:
+                # This is a new object
+                print "New object"
+                self.tracked_objects.append(bbox)
+            elif len(matches) == 1:
+                # Update its location
+                print "Already tracked"
+                matches[0].update(bbox)
+            else:
+                # Multiple possible matches - this is either overlapping fish
+                # or a bad segmentation.
+                print "Multiple possible matches!"
+            
+        self.draw_tracked_bounding_boxes(current_image.copy())
+
             
     
