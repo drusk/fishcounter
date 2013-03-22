@@ -88,7 +88,7 @@ class TrackedObject(object):
         self.dy = self.bbox.center[1] - new_bbox.center[1]
         
         new_area = cv2.contourArea(contour)
-        if self.dx < 2 and self.dy < 2 and new_area < self.area:
+        if abs(self.dx) < 2 and abs(self.dy) < 2 and new_area < self.area:
             # Object is probably stopping, and will fail to be segmented 
             # properly in future frames.  Freeze it. 
             self.is_frozen = True
