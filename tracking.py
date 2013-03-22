@@ -103,6 +103,12 @@ class TrackedObject(object):
     
     def contains(self, other_obj):
         return self.bbox.contains_bbox(other_obj.bbox)
+    
+    def bbox_overlap_area(self, other_obj):
+        return self.bbox.overlap_area(other_obj.bbox)
+    
+    def is_new(self):
+        return self.frames_tracked < 5
         
 
 class BoundingBox(object):
@@ -133,6 +139,10 @@ class BoundingBox(object):
     def bottom_right(self):
         return (self.x1, self.y1)
     
+    @property
+    def area(self):
+        return self.width * self.height
+
     def contains_point(self, point):
         return (point[0] >= self.x0 and point[0] <= self.x1 and
                 point[1] >= self.y0 and point[1] <= self.y1)
@@ -140,6 +150,11 @@ class BoundingBox(object):
     def contains_bbox(self, other_bbox):
         return (self.contains_point(other_bbox.top_left) and
                 self.contains_point(other_bbox.bottom_right))
+        
+    def overlap_area(self, other_bbox):
+        x_overlap = max(0, min(self.x1, other_bbox.x1) - max(self.x0, other_bbox.x0))
+        y_overlap = max(0, min(self.y1, other_bbox.y1) - max(self.y0, other_bbox.y0))
+        return x_overlap * y_overlap
         
     def update(self, bbox):
         self.x0 = bbox.x0
@@ -198,14 +213,12 @@ class ShapeFeatureTracker(object):
     def _prune_tracks(self):
         self._prune_short_tracks()
         self._prune_sub_tracks()
+        self._prune_high_overlap_tracks()
         
     def _prune_short_tracks(self):
-        """
-        Tracks less than 3 frames long should be ignored.
-        """
         obj_to_prune = []
         for obj in self.tracked_objects:
-            if (obj.frames_tracked < 3 and 
+            if (obj.is_new() and 
                 obj.last_frame_tracked < self.frame_number):
                 obj_to_prune.append(obj)
                 
@@ -229,7 +242,27 @@ class ShapeFeatureTracker(object):
         for obj in sub_tracks:
             print "Pruned sub track"
             self.tracked_objects.remove(obj)
-        
+    
+    def _prune_high_overlap_tracks(self):
+        obj_to_prune = []
+        for obj in self.tracked_objects:
+            for other_obj in self._get_other_objects(obj):
+                if other_obj.is_new():
+                    continue
+
+                if obj.bbox.area > other_obj.bbox.area:
+                    # only prune the smaller objects
+                    continue
+                  
+                if obj.bbox_overlap_area(other_obj) > 0.9 * obj.bbox.area:
+                    # This object is mostly overlapped with another
+                    obj_to_prune.append(obj)
+                    break # inner loop
+                
+        for obj in obj_to_prune:
+            print "Pruned high overlap object"
+            self.tracked_objects.remove(obj)
+    
     def update(self, current_image, contours):
         self.frame_number += 1
         
