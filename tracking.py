@@ -64,6 +64,8 @@ class TrackedObject(object):
         self.frames_tracked = 1
         self.last_frame_tracked = frame_number
         
+        self.is_frozen = False
+        
     @property
     def center(self):
         return self.bbox.center
@@ -81,13 +83,26 @@ class TrackedObject(object):
         self.dx = self.bbox.center[0] - new_bbox.center[0]
         self.dy = self.bbox.center[1] - new_bbox.center[1]
         
-        self.bbox.update(new_bbox)
-        self.area = cv2.contourArea(contour)
-        
-        self.rotated_bbox = cv2.minAreaRect(contour)
+        new_area = cv2.contourArea(contour)
+        if self.dx < 2 and self.dy < 2 and new_area < self.area:
+            # Object is probably stopping, and will fail to be segmented 
+            # properly in future frames.  Freeze it. 
+            self.is_frozen = True
+            print "FROZEN"
+        else:
+            self.is_frozen = False
+            print "UNFROZEN"
+            
+        if not self.is_frozen:
+            self.bbox.update(new_bbox)
+            self.area = new_area
+            self.rotated_bbox = cv2.minAreaRect(contour)
         
         self.frames_tracked += 1
         self.last_frame_tracked = frame_number
+    
+    def contains(self, other_obj):
+        return self.bbox.contains_bbox(other_obj.bbox)
         
 
 class BoundingBox(object):
@@ -121,6 +136,10 @@ class BoundingBox(object):
     def contains_point(self, point):
         return (point[0] >= self.x0 and point[0] <= self.x1 and
                 point[1] >= self.y0 and point[1] <= self.y1)
+        
+    def contains_bbox(self, other_bbox):
+        return (self.contains_point(other_bbox.top_left) and
+                self.contains_point(other_bbox.bottom_right))
         
     def update(self, bbox):
         self.x0 = bbox.x0
@@ -169,7 +188,6 @@ class ShapeFeatureTracker(object):
         return np.abs(obj1.area - obj2.area) < self.area_threshold
     
     def _is_angle_match(self, obj1, obj2):
-        print "Angles: %f %f" % (obj1.angle, obj2.angle)
         return np.abs(obj1.angle - obj2.angle) < self.angle_threshold
     
     def is_match(self, obj1, obj2):
@@ -178,6 +196,10 @@ class ShapeFeatureTracker(object):
                 self._is_angle_match(obj1, obj2))
         
     def _prune_tracks(self):
+        self._prune_short_tracks()
+        self._prune_sub_tracks()
+        
+    def _prune_short_tracks(self):
         """
         Tracks less than 3 frames long should be ignored.
         """
@@ -188,6 +210,24 @@ class ShapeFeatureTracker(object):
                 obj_to_prune.append(obj)
                 
         for obj in obj_to_prune:
+            print "Pruned short track"
+            self.tracked_objects.remove(obj)
+            
+    def _get_other_objects(self, obj):
+        other_objs = list(self.tracked_objects)
+        other_objs.remove(obj)
+        return other_objs
+            
+    def _prune_sub_tracks(self):
+        sub_tracks = []
+        for obj in self.tracked_objects:
+            for other_obj in self._get_other_objects(obj):
+                if other_obj.contains(obj):
+                    sub_tracks.append(obj)
+                    break # inner loop
+                
+        for obj in sub_tracks:
+            print "Pruned sub track"
             self.tracked_objects.remove(obj)
         
     def update(self, current_image, contours):
@@ -202,17 +242,18 @@ class ShapeFeatureTracker(object):
             
             if len(matches) == 0:
                 # This is a new object
-                print "New object"
+#                print "New object"
                 self.tracked_objects.append(new_obj)
                     
             elif len(matches) == 1:
                 # Update its location
-                print "Already tracked"
+#                print "Already tracked"
                 matches[0].update(bbox, contour, self.frame_number)
             else:
                 # Multiple possible matches - this is either overlapping fish
                 # or a bad segmentation.
-                print "Multiple possible matches!"
+#                print "Multiple possible matches!"
+                pass
             
         self._prune_tracks()
             
