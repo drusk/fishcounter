@@ -67,8 +67,12 @@ class TrackedObject(object):
     
     @property
     def angle(self):
-        # XXX inconsistent, seems to be 0 or -90 on same box
-        return self.rotated_bbox[2]
+        # raw angle seems inconsistent, can be 0 or -90 on same box
+        raw_angle =self.rotated_bbox[2] 
+        if raw_angle < -45:
+            return raw_angle + 90
+        else:
+            return raw_angle
         
     def update(self, new_bbox, contour):
         self.dx = self.bbox.center[0] - new_bbox.center[0]
@@ -163,7 +167,8 @@ class ShapeFeatureTracker(object):
     
     def is_match(self, obj1, obj2):
         return (self._is_centroid_match(obj1, obj2) and 
-                self._is_area_match(obj1, obj2))
+                self._is_area_match(obj1, obj2) and
+                self._is_angle_match(obj1, obj2))
         
     def update(self, current_image, contours):
         for contour in contours:
