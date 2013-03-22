@@ -52,7 +52,7 @@ class CamShiftTracker(object):
 
 class TrackedObject(object):
     
-    def __init__(self, bbox, contour):
+    def __init__(self, bbox, contour, frame_number):
         self.bbox = bbox
         self.area = cv2.contourArea(contour)
         self.rotated_bbox = cv2.minAreaRect(contour) 
@@ -60,6 +60,9 @@ class TrackedObject(object):
         # Keep track of "velocity"
         self.dx = 0
         self.dy = 0
+        
+        self.frames_tracked = 1
+        self.last_frame_tracked = frame_number
         
     @property
     def center(self):
@@ -74,7 +77,7 @@ class TrackedObject(object):
         else:
             return raw_angle
         
-    def update(self, new_bbox, contour):
+    def update(self, new_bbox, contour, frame_number):
         self.dx = self.bbox.center[0] - new_bbox.center[0]
         self.dy = self.bbox.center[1] - new_bbox.center[1]
         
@@ -82,6 +85,9 @@ class TrackedObject(object):
         self.area = cv2.contourArea(contour)
         
         self.rotated_bbox = cv2.minAreaRect(contour)
+        
+        self.frames_tracked += 1
+        self.last_frame_tracked = frame_number
         
 
 class BoundingBox(object):
@@ -127,6 +133,7 @@ class ShapeFeatureTracker(object):
     
     def __init__(self):
         self.tracked_objects = []
+        self.frame_number = 0
         
         # Thresholds for object similarity
         self.centroid_threshold = 40 # Euclidean distance
@@ -170,11 +177,26 @@ class ShapeFeatureTracker(object):
                 self._is_area_match(obj1, obj2) and
                 self._is_angle_match(obj1, obj2))
         
+    def _prune_tracks(self):
+        """
+        Tracks less than 3 frames long should be ignored.
+        """
+        obj_to_prune = []
+        for obj in self.tracked_objects:
+            if (obj.frames_tracked < 3 and 
+                obj.last_frame_tracked < self.frame_number):
+                obj_to_prune.append(obj)
+                
+        for obj in obj_to_prune:
+            self.tracked_objects.remove(obj)
+        
     def update(self, current_image, contours):
+        self.frame_number += 1
+        
         for contour in contours:
             bounding_rect = cv2.boundingRect(contour)
             bbox = BoundingBox(*bounding_rect)
-            new_obj = TrackedObject(bbox, contour)
+            new_obj = TrackedObject(bbox, contour, self.frame_number)
             
             matches = self._find_matching_objects(new_obj)
             
@@ -186,11 +208,13 @@ class ShapeFeatureTracker(object):
             elif len(matches) == 1:
                 # Update its location
                 print "Already tracked"
-                matches[0].update(bbox, contour)
+                matches[0].update(bbox, contour, self.frame_number)
             else:
                 # Multiple possible matches - this is either overlapping fish
                 # or a bad segmentation.
                 print "Multiple possible matches!"
+            
+        self._prune_tracks()
             
         self.draw_tracked_bounding_boxes(current_image.copy())
         print "Count %d" % self.count
