@@ -49,6 +49,37 @@ class CamShiftTracker(object):
             
         cv2.imshow("Tracker", debug_img)
 
+
+class TrackedObject(object):
+    
+    def __init__(self, bbox, contour):
+        self.bbox = bbox
+        self.area = cv2.contourArea(contour)
+        self.rotated_bbox = cv2.minAreaRect(contour) 
+        
+        # Keep track of "velocity"
+        self.dx = 0
+        self.dy = 0
+        
+    @property
+    def center(self):
+        return self.bbox.center
+    
+    @property
+    def angle(self):
+        # XXX inconsistent, seems to be 0 or -90 on same box
+        return self.rotated_bbox[2]
+        
+    def update(self, new_bbox, contour):
+        self.dx = self.bbox.center[0] - new_bbox.center[0]
+        self.dy = self.bbox.center[1] - new_bbox.center[1]
+        
+        self.bbox.update(new_bbox)
+        self.area = cv2.contourArea(contour)
+        
+        self.rotated_bbox = cv2.minAreaRect(contour)
+        
+
 class BoundingBox(object):
     
     def __init__(self, x0, y0, width, height):
@@ -86,47 +117,77 @@ class BoundingBox(object):
         self.y0 = bbox.y0
         self.width = bbox.width
         self.height = bbox.height
+        
 
-
-class BoundingBoxTracker(object):
+class ShapeFeatureTracker(object):
     
     def __init__(self):
         self.tracked_objects = []
         
+        # Thresholds for object similarity
+        self.centroid_threshold = 40 # Euclidean distance
+        self.area_threshold = 1500
+        self.angle_threshold = 30 # in degrees
+
+    @property
+    def count(self):
+        return len(self.tracked_objects)
+        
     def draw_tracked_bounding_boxes(self, img):
-        for bbox in self.tracked_objects:
-            cv2.rectangle(img, bbox.top_left, bbox.bottom_right, (255, 0, 0))
+        for obj in self.tracked_objects:
+            cv2.rectangle(img, obj.bbox.top_left, obj.bbox.bottom_right, (255, 0, 0))
+#            rbbox = obj.rotated_bbox
+#            points = cv2.cv.BoxPoints(rbbox)         # Find four vertices of rectangle from above rect
+#            cv2.polylines(img,np.array([points]),True,(0,0,255),2)# draw rectangle in blue color
         
         cv2.imshow("Tracker", img)
         
-    def _find_matching_objects(self, bbox):
+    def _find_matching_objects(self, new_obj):
         matches = []
         for obj in self.tracked_objects:
-            if obj.contains_point(bbox.center):
+            if self.is_match(new_obj, obj):
                 matches.append(obj)
         return matches
+    
+    def _is_centroid_match(self, obj1, obj2):
+        return (np.sqrt(np.square(obj1.center[0] - obj2.center[0]) + 
+                        np.square(obj1.center[1] - obj2.center[1]))
+                < self.centroid_threshold) 
+    
+    def _is_area_match(self, obj1, obj2):
+        return np.abs(obj1.area - obj2.area) < self.area_threshold
+    
+    def _is_angle_match(self, obj1, obj2):
+        print "Angles: %f %f" % (obj1.angle, obj2.angle)
+        return np.abs(obj1.angle - obj2.angle) < self.angle_threshold
+    
+    def is_match(self, obj1, obj2):
+        return (self._is_centroid_match(obj1, obj2) and 
+                self._is_area_match(obj1, obj2))
         
     def update(self, current_image, contours):
         for contour in contours:
             bounding_rect = cv2.boundingRect(contour)
             bbox = BoundingBox(*bounding_rect)
+            new_obj = TrackedObject(bbox, contour)
             
-            matches = self._find_matching_objects(bbox)
+            matches = self._find_matching_objects(new_obj)
             
             if len(matches) == 0:
                 # This is a new object
                 print "New object"
-                self.tracked_objects.append(bbox)
+                self.tracked_objects.append(new_obj)
+                    
             elif len(matches) == 1:
                 # Update its location
                 print "Already tracked"
-                matches[0].update(bbox)
+                matches[0].update(bbox, contour)
             else:
                 # Multiple possible matches - this is either overlapping fish
                 # or a bad segmentation.
                 print "Multiple possible matches!"
             
         self.draw_tracked_bounding_boxes(current_image.copy())
-
+        print "Count %d" % self.count
             
     
