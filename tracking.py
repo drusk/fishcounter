@@ -52,7 +52,7 @@ class CamShiftTracker(object):
 
 class TrackedObject(object):
     
-    def __init__(self, bbox, contour, frame_number):
+    def __init__(self, bbox, contour, frame_number, frame_width, frame_height):
         self.bbox = bbox
         self.area = cv2.contourArea(contour)
         self.rotated_bbox = cv2.minAreaRect(contour) 
@@ -61,8 +61,12 @@ class TrackedObject(object):
         self.dx = 0
         self.dy = 0
         
+        self.prev_area = 0
+        
         self.frames_tracked = 1
         self.last_frame_tracked = frame_number
+        self.frame_width = frame_width
+        self.frame_height = frame_height
         
         self.is_frozen = False
         
@@ -88,18 +92,20 @@ class TrackedObject(object):
             # Object is probably stopping, and will fail to be segmented 
             # properly in future frames.  Freeze it. 
             self.is_frozen = True
-            print "FROZEN"
         else:
             self.is_frozen = False
-            print "UNFROZEN"
             
         if not self.is_frozen:
             self.bbox.update(new_bbox)
+            self.prev_area = self.area
             self.area = new_area
             self.rotated_bbox = cv2.minAreaRect(contour)
         
         self.frames_tracked += 1
         self.last_frame_tracked = frame_number
+    
+    def delta_area(self):
+        return self.area - self.prev_area
     
     def contains(self, other_obj):
         return self.bbox.contains_bbox(other_obj.bbox)
@@ -109,7 +115,21 @@ class TrackedObject(object):
     
     def is_new(self):
         return self.frames_tracked < 5
+    
+    def is_leaving(self, border_thickness):
+        if self.delta_area() >= 0:
+            # Must be shrinking as it goes off screen.
+            return False
         
+        leaving_left = self.bbox.x0 < border_thickness and self.dx < 0
+        leaving_right = (self.bbox.x1 > (self.frame_width - border_thickness) and
+                         self.dx > 0)
+        leaving_top = self.bbox.y0 < border_thickness and self.dy < 0
+        leaving_bottom = (self.bbox.y1 > (self.frame_height - border_thickness) and
+                          self.dy > 0)
+        
+        return leaving_left or leaving_right or leaving_top or leaving_bottom
+    
 
 class BoundingBox(object):
     
@@ -169,15 +189,13 @@ class ShapeFeatureTracker(object):
         self.tracked_objects = []
         self.frame_number = 0
         
+        self.count = 0
+        
         # Thresholds for object similarity
         self.centroid_threshold = 40 # Euclidean distance
         self.area_threshold = 1500
         self.angle_threshold = 30 # in degrees
 
-    @property
-    def count(self):
-        return len(self.tracked_objects)
-        
     def draw_tracked_bounding_boxes(self, img):
         for obj in self.tracked_objects:
             cv2.rectangle(img, obj.bbox.top_left, obj.bbox.bottom_right, (255, 0, 0))
@@ -263,13 +281,26 @@ class ShapeFeatureTracker(object):
             print "Pruned high overlap object"
             self.tracked_objects.remove(obj)
     
+    def _process_leaving_objects(self):
+        leaving_objects = []
+        for obj in self.tracked_objects:
+            if not obj.is_new() and obj.is_leaving(5):
+                leaving_objects.append(obj)
+                
+        for leaving_object in leaving_objects:
+            self.tracked_objects.remove(leaving_object)
+            self.count += 1
+            print "Count: %d" % self.count
+    
     def update(self, current_image, contours):
         self.frame_number += 1
+        frame_height, frame_width = current_image.shape[:2]
         
         for contour in contours:
             bounding_rect = cv2.boundingRect(contour)
             bbox = BoundingBox(*bounding_rect)
-            new_obj = TrackedObject(bbox, contour, self.frame_number)
+            new_obj = TrackedObject(bbox, contour, self.frame_number, 
+                                    frame_width, frame_height)
             
             matches = self._find_matching_objects(new_obj)
             
@@ -289,8 +320,9 @@ class ShapeFeatureTracker(object):
                 pass
             
         self._prune_tracks()
+        
+#        self._process_leaving_objects() # XXX not working very well yet
             
         self.draw_tracked_bounding_boxes(current_image.copy())
-        print "Count %d" % self.count
-            
+        
     
