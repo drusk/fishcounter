@@ -6,7 +6,8 @@ import sys
 from segment import (CompositeSegmentationAlgorithm, 
                      MovingAverageBackgroundSubtractor,
                      MixtureOfGaussiansBackgroundSubtractor)
-from tracking import BoundingBoxTracker, CamShiftTracker
+
+from tracking import BoundingBoxTracker, CamShiftTracker, ShapeFeatureTracker
 from videoanalyzer import Analyzer
 from videoreader import VideoReader
 
@@ -14,7 +15,7 @@ def run(video_path, skip=0):
     segmenter = CompositeSegmentationAlgorithm(
                     MovingAverageBackgroundSubtractor(0.05),
                     MixtureOfGaussiansBackgroundSubtractor())
-    tracker = BoundingBoxTracker()
+    tracker = ShapeFeatureTracker()
     analyzer = Analyzer(segmenter, tracker)
     VideoReader(video_path, analyzer).start(skip)
 
