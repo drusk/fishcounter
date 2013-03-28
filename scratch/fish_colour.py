@@ -12,7 +12,7 @@ def hsv_test(img):
     hue_max = 100
     sat_min = 0.
     sat_max = 100
-    val_min = 90.
+    val_min = 100.
     val_max = 255.
     mask = cv2.inRange(hsv, np.array((hue_min, sat_min, val_min)), 
                             np.array((hue_max, sat_max, val_max)))
@@ -21,6 +21,7 @@ def hsv_test(img):
     
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=17)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=3)
     
     cv2.imshow("Postprocessed", mask)
     
@@ -30,3 +31,6 @@ def hsv_test(img):
 if __name__ == "__main__":
     img = cv2.imread("data/fish_ss.png")
     hsv_test(img)
+    
+    shadow_img = cv2.imread("data/fish_and_shadow.jpg")
+    hsv_test(shadow_img)
