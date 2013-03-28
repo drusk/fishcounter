@@ -138,6 +138,13 @@ class BoundingBox(object):
         self.y0 = y0
         self.width = width
         self.height = height
+
+    @property
+    def cv2rect(self):
+        """
+        Represent the bounding box in the format that opencv uses.
+        """
+        return (self.x0, self.y0, self.width, self.height)
         
     @property
     def x1(self):
@@ -177,10 +184,18 @@ class BoundingBox(object):
         return x_overlap * y_overlap
         
     def update(self, bbox):
-        self.x0 = bbox.x0
-        self.y0 = bbox.y0
-        self.width = bbox.width
-        self.height = bbox.height
+        if isinstance(bbox, BoundingBox):
+            self.x0 = bbox.x0
+            self.y0 = bbox.y0
+            self.width = bbox.width
+            self.height = bbox.height
+        elif isinstance(bbox, tuple):
+            self.x0 = bbox[0]
+            self.y0 = bbox[1]
+            self.width = bbox[2]
+            self.height = bbox[3]
+        else:
+            raise ValueError("Unknown representation of bounding box.")
         
 
 class ShapeFeatureTracker(object):
