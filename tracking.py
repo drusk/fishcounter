@@ -5,6 +5,8 @@ Tracking algorithms.
 import cv2
 import numpy as np
 
+from segment import HSVColourSegmenter
+
 class CamShiftTracker(object):
     """
     Example:
@@ -13,41 +15,49 @@ class CamShiftTracker(object):
     
     def __init__(self):
         self.tracked_objects = []
+        self.mask_detector = HSVColourSegmenter()
         
-    def update(self, current_image, contours):
-        hsv = cv2.cvtColor(current_image, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, np.array((0., 60., 32.)), 
-                           np.array((180., 255., 255.)))
-        
-        debug_img = current_image.copy()
-        
-        for contour in contours:
-            bounding_rect = cv2.boundingRect(contour)
-            x1, y1, width, height = bounding_rect
-            
-            x2 = x1 + width
-            y2 = y1 + height
-            
-            hsv_roi = hsv[y1:y2, x1:x2]
-            mask_roi = mask[y1:y2, x1:x2]
+    def track(self, objects):
+        self.tracked_objects.extend(objects)
 
-            hist = cv2.calcHist([hsv_roi], [0], mask_roi, [16], [0, 180])
+    def update(self, current_image):
+        hsv = cv2.cvtColor(current_image, cv2.COLOR_BGR2HSV)
+        mask = self.mask_detector.segment(current_image)
+        
+        cv2.imshow("Mask", mask)
+        
+        for obj in self.tracked_objects:
+            bbox = obj.bbox
+            hsv_roi = hsv[bbox.y0:bbox.y1, bbox.x0:bbox.x1]
+            mask_roi = mask[bbox.y0:bbox.y1, bbox.x0:bbox.x1]
+
+            bin_range = [self.mask_detector.hue_min, self.mask_detector.hue_max]
+            hist = cv2.calcHist([hsv_roi], # source image(s)
+                                [0], # channels to use - just Hue
+                                mask_roi, # mask which source pixels to count
+                                [16], # number of bins
+                                bin_range # first bin min, last bin max
+                                )
             cv2.normalize(hist, hist, 0, 255, cv2.NORM_MINMAX)
             hist = hist.reshape(-1)
             
-            prob = cv2.calcBackProject([hsv], [0], hist, [0, 180], 1)
+            prob = cv2.calcBackProject([hsv], # input image
+                                       [0], # channels to use - just Hue
+                                       hist, # histogram
+                                       bin_range, # first bin min, last bin max
+                                       1 # scale factor
+                                       )
             prob &= mask
             
-            term_crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1)
-            track_box, track_window = cv2.CamShift(prob, bounding_rect, term_crit)
-            tx1, ty1, twidth, theight = track_window
-            
+            stop_criteria = (cv2.TERM_CRITERIA_COUNT | cv2.TERM_CRITERIA_EPS, 
+                             10, # max iterationsstop when window center shifts less than this distance
+                             1 # desired accuracy of window center 
+                             )
+
             # what is the difference between track_box and track_window?
+            track_box, track_window = cv2.CamShift(prob, bbox.cv2rect, stop_criteria)
             
-            cv2.rectangle(debug_img, (tx1, ty1), (tx1 + twidth, ty1 + theight),
-                           (255, 0, 0))
-            
-        cv2.imshow("Tracker", debug_img)
+            bbox.update(track_window)
 
 
 class TrackedObject(object):
