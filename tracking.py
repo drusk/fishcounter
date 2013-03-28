@@ -18,20 +18,25 @@ class MultistageTracker(object):
     def __init__(self):
         self.shape_tracker = ShapeFeatureTracker()
         self.camshift_tracker = CamShiftTracker()
-        self.count = 0 
+    
+    @property
+    def count(self):
+        return len(self.camshift_tracker.tracked_objects)
     
     def update(self, current_image, contours):
         handoff_objects = self.shape_tracker.update(current_image, contours, 
                                         self.camshift_tracker.tracked_objects)
         
         if handoff_objects:
-            self.count += len(handoff_objects)
             self.camshift_tracker.track(handoff_objects)
             print "Fish count: %d" % self.count
             
         self.camshift_tracker.update(current_image)
         
-        self.draw_tracked_bounding_boxes(current_image.copy())
+        display = current_image.copy()
+        self.draw_tracked_bounding_boxes(display)
+        self.draw_counter(display)
+        cv2.imshow("Tracker", display)
         
     def draw_tracked_bounding_boxes(self, img):
         min_x = 0
@@ -49,8 +54,6 @@ class MultistageTracker(object):
                           self.restrict_point(obj.bbox.bottom_right, min_x, max_x, min_y, max_y),
                           (0, 0, 255))
             
-        cv2.imshow("Tracker", img)
-
     def restrict_point(self, point, min_x, max_x, min_y, max_y):
         return (self.restrict_val(point[0], min_x, max_x), 
                 self.restrict_val(point[1], min_y, max_y))
@@ -62,6 +65,18 @@ class MultistageTracker(object):
             return max_val
         else:
             return val
+        
+    def draw_counter(self, img):
+        padding = 10
+        text_bottom_left = (padding, img.shape[0] - padding)
+
+        text = str(self.count)
+        color = (0, 255, 255)
+        fontFace = cv2.FONT_HERSHEY_SCRIPT_COMPLEX
+        fontScale = 2
+        thickness = 4
+        cv2.putText(img, text, text_bottom_left, fontFace, 
+                    fontScale, color, thickness)
     
 
 class CamShiftTracker(object):
@@ -81,7 +96,7 @@ class CamShiftTracker(object):
         hsv = cv2.cvtColor(current_image, cv2.COLOR_BGR2HSV)
         mask = self.mask_detector.segment(current_image)
         
-        cv2.imshow("Mask", mask)
+#        cv2.imshow("Mask", mask)
         
         for obj in self.tracked_objects:
             bbox = obj.bbox
