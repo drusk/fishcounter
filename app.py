@@ -4,7 +4,8 @@ Main module of the application performing fish counting.
 
 from segment import (CompositeSegmentationAlgorithm, 
                      MovingAverageBackgroundSubtractor,
-                     MixtureOfGaussiansBackgroundSubtractor)
+                     MixtureOfGaussiansBackgroundSubtractor,
+                     HSVColourSegmenter)
 from tracking import ShapeFeatureTracker
 from videoanalyzer import Analyzer
 from videoreader import VideoReader
@@ -12,8 +13,8 @@ from videoreader import VideoReader
 def run(video_path):
     segmenter = CompositeSegmentationAlgorithm([
                     MovingAverageBackgroundSubtractor(0.05),
-                    MixtureOfGaussiansBackgroundSubtractor()
-                    ])
+                    MixtureOfGaussiansBackgroundSubtractor(),
+                    HSVColourSegmenter()])
     tracker = ShapeFeatureTracker()
     analyzer = Analyzer(segmenter, tracker)
     VideoReader(video_path, analyzer).start()

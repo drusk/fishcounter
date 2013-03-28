@@ -7,6 +7,41 @@ import numpy as np
 
 MAX_PIXEL_VALUE = 255
 
+class HSVColourSegmenter(object):
+    
+    def __init__(self):
+        # IMPORTANT NOTE:
+        #   Hue range:        [0, 180]
+        #   Saturation range: [0, 255]
+        #   Value range:      [0, 255]
+        # This is not the same as programs like gcolor2!
+        self.hue_min = 75
+        self.hue_max = 100
+        self.sat_min = 0.
+        self.sat_max = 100
+        self.val_min = 100.
+        self.val_max = 255.
+        
+        # For cleaning
+        self.kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    
+    def segment(self, current_image):
+        hsv_img = cv2.cvtColor(current_image, cv2.COLOR_BGR2HSV) 
+
+        min_vals = np.array([self.hue_min, self.sat_min, self.val_min])
+        max_vals = np.array([self.sat_max, self.sat_max, self.val_max])
+        bin_img = cv2.inRange(hsv_img, min_vals, max_vals)
+        
+        return self._clean(bin_img)
+        
+    def _clean(self, bin_img):
+        bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_CLOSE, self.kernel, 
+                                   iterations=17)
+        bin_img = cv2.morphologyEx(bin_img, cv2.MORPH_OPEN, self.kernel, 
+                                   iterations=3)
+        return bin_img
+    
+
 class MovingAverageBackgroundSubtractor(object):
     
     def __init__(self, alpha):
