@@ -52,15 +52,24 @@ class MixtureOfGaussiansBackgroundSubtractor(object):
 
 
 class CompositeSegmentationAlgorithm(object):
+    """
+    Performs logical AND operation on the segmentation results of the 
+    component segmentation algorithms.
+    """
     
-    def __init__(self, algorithm1, algorithm2):
-        self.algorithm1 = algorithm1
-        self.algorithm2 = algorithm2
+    def __init__(self, algorithms):
+        self.algorithms = algorithms
         
     def segment(self, current_image):
-        segmentation1 = self.algorithm1.segment(current_image)
-        segmentation2 = self.algorithm2.segment(current_image)
+        overall_segmentation = None
         
-        # perform 'AND' operation
-        return segmentation1 & segmentation2
+        for algorithm in self.algorithms:
+            segmentation = algorithm.segment(current_image)
+
+            if overall_segmentation is None:
+                overall_segmentation = segmentation
+            else:
+                overall_segmentation &= segmentation
+
+        return overall_segmentation
 

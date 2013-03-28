@@ -10,9 +10,10 @@ from videoanalyzer import Analyzer
 from videoreader import VideoReader
 
 def run(video_path):
-    segmenter = CompositeSegmentationAlgorithm(
+    segmenter = CompositeSegmentationAlgorithm([
                     MovingAverageBackgroundSubtractor(0.05),
-                    MixtureOfGaussiansBackgroundSubtractor())
+                    MixtureOfGaussiansBackgroundSubtractor()
+                    ])
     tracker = ShapeFeatureTracker()
     analyzer = Analyzer(segmenter, tracker)
     VideoReader(video_path, analyzer).start()
