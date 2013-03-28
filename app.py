@@ -7,7 +7,7 @@ from segment import (CompositeSegmentationAlgorithm,
                      MovingAverageBackgroundSubtractor,
                      MixtureOfGaussiansBackgroundSubtractor,
                      HSVColourSegmenter)
-from tracking import ShapeFeatureTracker
+from tracking import MultistageTracker
 from videoanalyzer import Analyzer
 from videoreader import VideoReader
 
@@ -16,7 +16,7 @@ def run(video_path, skip=0):
                     MovingAverageBackgroundSubtractor(0.05),
                     MixtureOfGaussiansBackgroundSubtractor(),
                     HSVColourSegmenter()])
-    tracker = ShapeFeatureTracker()
+    tracker = MultistageTracker()
     analyzer = Analyzer(segmenter, tracker)
     VideoReader(video_path, analyzer).start(skip)
 

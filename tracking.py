@@ -209,16 +209,23 @@ class BoundingBox(object):
         
 
 class ShapeFeatureTracker(object):
+    """
+    Performs the early tracking where we determine if an object is of 
+    interest for further tracking.
+    
+    It is based on the following shape features: centroid location, 
+    orientation and area.
+    """
     
     def __init__(self):
-        self.tracked_objects = []
+        self.potential_objects = []
         self.frame_number = 0
         
         self.count = 0
         
         # Thresholds for object similarity
         self.centroid_threshold = 40 # Euclidean distance
-        self.area_threshold = 1500
+        self.area_threshold = 1750
         self.angle_threshold = 30 # in degrees
 
     def draw_tracked_bounding_boxes(self, img):
@@ -257,26 +264,40 @@ class ShapeFeatureTracker(object):
         self._prune_short_tracks()
         self._prune_sub_tracks()
         self._prune_high_overlap_tracks()
+        self._prune_super_tracks()
         
     def _prune_short_tracks(self):
         obj_to_prune = []
-        for obj in self.tracked_objects:
-            if (obj.is_new() and 
+        for obj in self.potential_objects:
+            if (obj.is_new() and
                 obj.last_frame_tracked < self.frame_number):
                 obj_to_prune.append(obj)
                 
         for obj in obj_to_prune:
             print "Pruned short track"
-            self.tracked_objects.remove(obj)
+            self.potential_objects.remove(obj)
+            
+    def _prune_super_tracks(self):
+        obj_to_prune = set()
+        for potential_object in self.potential_objects:
+            for known_object in self.known_objects:
+                overlap = potential_object.bbox_overlap_area(known_object) 
+                if overlap > 0.75 * known_object.bbox.area:
+                    obj_to_prune.add(potential_object)
+                    
+        for obj in obj_to_prune:
+            print "Pruned super track"
+            self.potential_objects.remove(obj)
             
     def _get_other_objects(self, obj):
-        other_objs = list(self.tracked_objects)
+        other_objs = list(self.known_objects)
+        other_objs.extend(self.potential_objects)
         other_objs.remove(obj)
         return other_objs
             
     def _prune_sub_tracks(self):
         sub_tracks = []
-        for obj in self.tracked_objects:
+        for obj in self.potential_objects:
             for other_obj in self._get_other_objects(obj):
                 if other_obj.contains(obj):
                     sub_tracks.append(obj)
@@ -284,11 +305,11 @@ class ShapeFeatureTracker(object):
                 
         for obj in sub_tracks:
             print "Pruned sub track"
-            self.tracked_objects.remove(obj)
+            self.potential_objects.remove(obj)
     
     def _prune_high_overlap_tracks(self):
         obj_to_prune = []
-        for obj in self.tracked_objects:
+        for obj in self.potential_objects:
             for other_obj in self._get_other_objects(obj):
                 if other_obj.is_new():
                     continue
@@ -297,14 +318,14 @@ class ShapeFeatureTracker(object):
                     # only prune the smaller objects
                     continue
                   
-                if obj.bbox_overlap_area(other_obj) > 0.9 * obj.bbox.area:
+                if obj.bbox_overlap_area(other_obj) > 0.75 * obj.bbox.area:
                     # This object is mostly overlapped with another
                     obj_to_prune.append(obj)
                     break # inner loop
                 
         for obj in obj_to_prune:
             print "Pruned high overlap object"
-            self.tracked_objects.remove(obj)
+            self.potential_objects.remove(obj)
     
     def _process_leaving_objects(self):
         leaving_objects = []
@@ -317,8 +338,39 @@ class ShapeFeatureTracker(object):
             self.count += 1
             print "Count: %d" % self.count
     
-    def update(self, current_image, contours):
+    def handoff_objects_of_interest(self):
+        """
+        After we have tracked an object for a while, we become more certain 
+        it is one of the objects of interest.  Hand it off to the next 
+        tracker.
+        """
+        handoff_objects = []
+        for obj in self.potential_objects:
+            if not obj.is_new():
+                handoff_objects.append(obj)
+        
+        for obj in handoff_objects:
+            self.potential_objects.remove(obj)
+                    
+        return handoff_objects
+    
+    def matches_known_object(self, new_obj):
+        for obj in self.known_objects:
+            if self.is_match(new_obj, obj):
+                return True
+        return False
+    
+    def match_potential_objects(self, new_obj):
+        matches = []
+        for obj in self.potential_objects:
+            if self.is_match(new_obj, obj):
+                matches.append(obj)
+        return matches
+    
+    def update(self, current_image, contours, known_objects):
+        self.known_objects = known_objects
         self.frame_number += 1
+        
         frame_height, frame_width = current_image.shape[:2]
         
         for contour in contours:
@@ -327,27 +379,75 @@ class ShapeFeatureTracker(object):
             new_obj = TrackedObject(bbox, contour, self.frame_number, 
                                     frame_width, frame_height)
             
-            matches = self._find_matching_objects(new_obj)
+            if self.matches_known_object(new_obj):
+                self._prune_tracks()
+                continue
             
+            matches = self.match_potential_objects(new_obj)
             if len(matches) == 0:
-                # This is a new object
-#                print "New object"
-                self.tracked_objects.append(new_obj)
-                    
-            elif len(matches) == 1:
-                # Update its location
-#                print "Already tracked"
-                matches[0].update(bbox, contour, self.frame_number)
+                self.potential_objects.append(new_obj)
             else:
-                # Multiple possible matches - this is either overlapping fish
-                # or a bad segmentation.
-#                print "Multiple possible matches!"
-                pass
-            
+                # TODO: what if there are multiple matches?
+                matches[0].update(bbox, contour, self.frame_number)
+                
         self._prune_tracks()
         
-#        self._process_leaving_objects() # XXX not working very well yet
+        return self.handoff_objects_of_interest()
+        
+
+class MultistageTracker(object):
+    """
+    Use ShapeFeatureTracker to find the initial objects until they have been 
+    tracked long enough to be considered objects of interest.  Then let
+    the CamShiftTracker take over so we can handle when they stop moving.
+    Increment counter once the handover has taken place.
+    """
+    
+    def __init__(self):
+        self.shape_tracker = ShapeFeatureTracker()
+        self.camshift_tracker = CamShiftTracker()
+        self.count = 0 
+    
+    def update(self, current_image, contours):
+        handoff_objects = self.shape_tracker.update(current_image, contours, 
+                                        self.camshift_tracker.tracked_objects)
+        
+        if handoff_objects:
+            self.count += len(handoff_objects)
+            self.camshift_tracker.track(handoff_objects)
+            print "Fish count: %d" % self.count
             
+        self.camshift_tracker.update(current_image)
+        
         self.draw_tracked_bounding_boxes(current_image.copy())
         
+    def draw_tracked_bounding_boxes(self, img):
+        min_x = 0
+        max_x = img.shape[1]
+        min_y = 0
+        max_y = img.shape[0]
+        
+        # Draw potential objects in yellow
+        for obj in self.shape_tracker.potential_objects:
+            cv2.rectangle(img, obj.bbox.top_left, obj.bbox.bottom_right, (0, 255, 255))
+        
+        # Draw 'confirmed' objects in red
+        for obj in self.camshift_tracker.tracked_objects:
+            cv2.rectangle(img, self.restrict_point(obj.bbox.top_left, min_x, max_x, min_y, max_y), 
+                          self.restrict_point(obj.bbox.bottom_right, min_x, max_x, min_y, max_y),
+                          (0, 0, 255))
+            
+        cv2.imshow("Tracker", img)
+
+    def restrict_point(self, point, min_x, max_x, min_y, max_y):
+        return (self.restrict_val(point[0], min_x, max_x), 
+                self.restrict_val(point[1], min_y, max_y))
+            
+    def restrict_val(self, val, min_val, max_val):
+        if val < min_val:
+            return min_val
+        elif val > max_val:
+            return max_val
+        else:
+            return val
     
