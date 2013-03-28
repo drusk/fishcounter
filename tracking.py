@@ -7,6 +7,63 @@ import numpy as np
 
 from segment import HSVColourSegmenter
 
+class MultistageTracker(object):
+    """
+    Use ShapeFeatureTracker to find the initial objects until they have been 
+    tracked long enough to be considered objects of interest.  Then let
+    the CamShiftTracker take over so we can handle when they stop moving.
+    Increment counter once the handover has taken place.
+    """
+    
+    def __init__(self):
+        self.shape_tracker = ShapeFeatureTracker()
+        self.camshift_tracker = CamShiftTracker()
+        self.count = 0 
+    
+    def update(self, current_image, contours):
+        handoff_objects = self.shape_tracker.update(current_image, contours, 
+                                        self.camshift_tracker.tracked_objects)
+        
+        if handoff_objects:
+            self.count += len(handoff_objects)
+            self.camshift_tracker.track(handoff_objects)
+            print "Fish count: %d" % self.count
+            
+        self.camshift_tracker.update(current_image)
+        
+        self.draw_tracked_bounding_boxes(current_image.copy())
+        
+    def draw_tracked_bounding_boxes(self, img):
+        min_x = 0
+        max_x = img.shape[1]
+        min_y = 0
+        max_y = img.shape[0]
+        
+        # Draw potential objects in yellow
+        for obj in self.shape_tracker.potential_objects:
+            cv2.rectangle(img, obj.bbox.top_left, obj.bbox.bottom_right, (0, 255, 255))
+        
+        # Draw 'confirmed' objects in red
+        for obj in self.camshift_tracker.tracked_objects:
+            cv2.rectangle(img, self.restrict_point(obj.bbox.top_left, min_x, max_x, min_y, max_y), 
+                          self.restrict_point(obj.bbox.bottom_right, min_x, max_x, min_y, max_y),
+                          (0, 0, 255))
+            
+        cv2.imshow("Tracker", img)
+
+    def restrict_point(self, point, min_x, max_x, min_y, max_y):
+        return (self.restrict_val(point[0], min_x, max_x), 
+                self.restrict_val(point[1], min_y, max_y))
+            
+    def restrict_val(self, val, min_val, max_val):
+        if val < min_val:
+            return min_val
+        elif val > max_val:
+            return max_val
+        else:
+            return val
+    
+
 class CamShiftTracker(object):
     """
     Example:
@@ -59,154 +116,6 @@ class CamShiftTracker(object):
             
             bbox.update(track_window)
 
-
-class TrackedObject(object):
-    
-    def __init__(self, bbox, contour, frame_number, frame_width, frame_height):
-        self.bbox = bbox
-        self.area = cv2.contourArea(contour)
-        self.rotated_bbox = cv2.minAreaRect(contour) 
-        
-        # Keep track of "velocity"
-        self.dx = 0
-        self.dy = 0
-        
-        self.prev_area = 0
-        
-        self.frames_tracked = 1
-        self.last_frame_tracked = frame_number
-        self.frame_width = frame_width
-        self.frame_height = frame_height
-        
-        self.is_frozen = False
-        
-    @property
-    def center(self):
-        return self.bbox.center
-    
-    @property
-    def angle(self):
-        # raw angle seems inconsistent, can be 0 or -90 on same box
-        raw_angle =self.rotated_bbox[2] 
-        if raw_angle < -45:
-            return raw_angle + 90
-        else:
-            return raw_angle
-        
-    def update(self, new_bbox, contour, frame_number):
-        self.dx = self.bbox.center[0] - new_bbox.center[0]
-        self.dy = self.bbox.center[1] - new_bbox.center[1]
-        
-        new_area = cv2.contourArea(contour)
-        if abs(self.dx) < 2 and abs(self.dy) < 2 and new_area < self.area:
-            # Object is probably stopping, and will fail to be segmented 
-            # properly in future frames.  Freeze it. 
-            self.is_frozen = True
-        else:
-            self.is_frozen = False
-            
-        if not self.is_frozen:
-            self.bbox.update(new_bbox)
-            self.prev_area = self.area
-            self.area = new_area
-            self.rotated_bbox = cv2.minAreaRect(contour)
-        
-        self.frames_tracked += 1
-        self.last_frame_tracked = frame_number
-    
-    def delta_area(self):
-        return self.area - self.prev_area
-    
-    def contains(self, other_obj):
-        return self.bbox.contains_bbox(other_obj.bbox)
-    
-    def bbox_overlap_area(self, other_obj):
-        return self.bbox.overlap_area(other_obj.bbox)
-    
-    def is_new(self):
-        return self.frames_tracked < 5
-    
-    def is_leaving(self, border_thickness):
-        if self.delta_area() >= 0:
-            # Must be shrinking as it goes off screen.
-            return False
-        
-        leaving_left = self.bbox.x0 < border_thickness and self.dx < 0
-        leaving_right = (self.bbox.x1 > (self.frame_width - border_thickness) and
-                         self.dx > 0)
-        leaving_top = self.bbox.y0 < border_thickness and self.dy < 0
-        leaving_bottom = (self.bbox.y1 > (self.frame_height - border_thickness) and
-                          self.dy > 0)
-        
-        return leaving_left or leaving_right or leaving_top or leaving_bottom
-    
-
-class BoundingBox(object):
-    
-    def __init__(self, x0, y0, width, height):
-        self.x0 = x0
-        self.y0 = y0
-        self.width = width
-        self.height = height
-
-    @property
-    def cv2rect(self):
-        """
-        Represent the bounding box in the format that opencv uses.
-        """
-        return (self.x0, self.y0, self.width, self.height)
-        
-    @property
-    def x1(self):
-        return self.x0 + self.width
-    
-    @property
-    def y1(self):
-        return self.y0 + self.height
-        
-    @property
-    def center(self):
-        return (self.x0 + self.width / 2, self.y0 + self.height / 2)
-    
-    @property
-    def top_left(self):
-        return (self.x0, self.y0)
-    
-    @property
-    def bottom_right(self):
-        return (self.x1, self.y1)
-    
-    @property
-    def area(self):
-        return self.width * self.height
-
-    def contains_point(self, point):
-        return (point[0] >= self.x0 and point[0] <= self.x1 and
-                point[1] >= self.y0 and point[1] <= self.y1)
-        
-    def contains_bbox(self, other_bbox):
-        return (self.contains_point(other_bbox.top_left) and
-                self.contains_point(other_bbox.bottom_right))
-        
-    def overlap_area(self, other_bbox):
-        x_overlap = max(0, min(self.x1, other_bbox.x1) - max(self.x0, other_bbox.x0))
-        y_overlap = max(0, min(self.y1, other_bbox.y1) - max(self.y0, other_bbox.y0))
-        return x_overlap * y_overlap
-        
-    def update(self, bbox):
-        if isinstance(bbox, BoundingBox):
-            self.x0 = bbox.x0
-            self.y0 = bbox.y0
-            self.width = bbox.width
-            self.height = bbox.height
-        elif isinstance(bbox, tuple):
-            self.x0 = bbox[0]
-            self.y0 = bbox[1]
-            self.width = bbox[2]
-            self.height = bbox[3]
-        else:
-            raise ValueError("Unknown representation of bounding box.")
-        
 
 class ShapeFeatureTracker(object):
     """
@@ -395,59 +304,150 @@ class ShapeFeatureTracker(object):
         return self.handoff_objects_of_interest()
         
 
-class MultistageTracker(object):
-    """
-    Use ShapeFeatureTracker to find the initial objects until they have been 
-    tracked long enough to be considered objects of interest.  Then let
-    the CamShiftTracker take over so we can handle when they stop moving.
-    Increment counter once the handover has taken place.
-    """
+class TrackedObject(object):
     
-    def __init__(self):
-        self.shape_tracker = ShapeFeatureTracker()
-        self.camshift_tracker = CamShiftTracker()
-        self.count = 0 
+    def __init__(self, bbox, contour, frame_number, frame_width, frame_height):
+        self.bbox = bbox
+        self.area = cv2.contourArea(contour)
+        self.rotated_bbox = cv2.minAreaRect(contour) 
+        
+        # Keep track of "velocity"
+        self.dx = 0
+        self.dy = 0
+        
+        self.prev_area = 0
+        
+        self.frames_tracked = 1
+        self.last_frame_tracked = frame_number
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+        
+        self.is_frozen = False
+        
+    @property
+    def center(self):
+        return self.bbox.center
     
-    def update(self, current_image, contours):
-        handoff_objects = self.shape_tracker.update(current_image, contours, 
-                                        self.camshift_tracker.tracked_objects)
-        
-        if handoff_objects:
-            self.count += len(handoff_objects)
-            self.camshift_tracker.track(handoff_objects)
-            print "Fish count: %d" % self.count
-            
-        self.camshift_tracker.update(current_image)
-        
-        self.draw_tracked_bounding_boxes(current_image.copy())
-        
-    def draw_tracked_bounding_boxes(self, img):
-        min_x = 0
-        max_x = img.shape[1]
-        min_y = 0
-        max_y = img.shape[0]
-        
-        # Draw potential objects in yellow
-        for obj in self.shape_tracker.potential_objects:
-            cv2.rectangle(img, obj.bbox.top_left, obj.bbox.bottom_right, (0, 255, 255))
-        
-        # Draw 'confirmed' objects in red
-        for obj in self.camshift_tracker.tracked_objects:
-            cv2.rectangle(img, self.restrict_point(obj.bbox.top_left, min_x, max_x, min_y, max_y), 
-                          self.restrict_point(obj.bbox.bottom_right, min_x, max_x, min_y, max_y),
-                          (0, 0, 255))
-            
-        cv2.imshow("Tracker", img)
-
-    def restrict_point(self, point, min_x, max_x, min_y, max_y):
-        return (self.restrict_val(point[0], min_x, max_x), 
-                self.restrict_val(point[1], min_y, max_y))
-            
-    def restrict_val(self, val, min_val, max_val):
-        if val < min_val:
-            return min_val
-        elif val > max_val:
-            return max_val
+    @property
+    def angle(self):
+        # raw angle seems inconsistent, can be 0 or -90 on same box
+        raw_angle =self.rotated_bbox[2] 
+        if raw_angle < -45:
+            return raw_angle + 90
         else:
-            return val
+            return raw_angle
+        
+    def update(self, new_bbox, contour, frame_number):
+        self.dx = self.bbox.center[0] - new_bbox.center[0]
+        self.dy = self.bbox.center[1] - new_bbox.center[1]
+        
+        new_area = cv2.contourArea(contour)
+        if abs(self.dx) < 2 and abs(self.dy) < 2 and new_area < self.area:
+            # Object is probably stopping, and will fail to be segmented 
+            # properly in future frames.  Freeze it. 
+            self.is_frozen = True
+        else:
+            self.is_frozen = False
+            
+        if not self.is_frozen:
+            self.bbox.update(new_bbox)
+            self.prev_area = self.area
+            self.area = new_area
+            self.rotated_bbox = cv2.minAreaRect(contour)
+        
+        self.frames_tracked += 1
+        self.last_frame_tracked = frame_number
     
+    def delta_area(self):
+        return self.area - self.prev_area
+    
+    def contains(self, other_obj):
+        return self.bbox.contains_bbox(other_obj.bbox)
+    
+    def bbox_overlap_area(self, other_obj):
+        return self.bbox.overlap_area(other_obj.bbox)
+    
+    def is_new(self):
+        return self.frames_tracked < 5
+    
+    def is_leaving(self, border_thickness):
+        if self.delta_area() >= 0:
+            # Must be shrinking as it goes off screen.
+            return False
+        
+        leaving_left = self.bbox.x0 < border_thickness and self.dx < 0
+        leaving_right = (self.bbox.x1 > (self.frame_width - border_thickness) and
+                         self.dx > 0)
+        leaving_top = self.bbox.y0 < border_thickness and self.dy < 0
+        leaving_bottom = (self.bbox.y1 > (self.frame_height - border_thickness) and
+                          self.dy > 0)
+        
+        return leaving_left or leaving_right or leaving_top or leaving_bottom
+    
+
+class BoundingBox(object):
+    
+    def __init__(self, x0, y0, width, height):
+        self.x0 = x0
+        self.y0 = y0
+        self.width = width
+        self.height = height
+
+    @property
+    def cv2rect(self):
+        """
+        Represent the bounding box in the format that opencv uses.
+        """
+        return (self.x0, self.y0, self.width, self.height)
+        
+    @property
+    def x1(self):
+        return self.x0 + self.width
+    
+    @property
+    def y1(self):
+        return self.y0 + self.height
+        
+    @property
+    def center(self):
+        return (self.x0 + self.width / 2, self.y0 + self.height / 2)
+    
+    @property
+    def top_left(self):
+        return (self.x0, self.y0)
+    
+    @property
+    def bottom_right(self):
+        return (self.x1, self.y1)
+    
+    @property
+    def area(self):
+        return self.width * self.height
+
+    def contains_point(self, point):
+        return (point[0] >= self.x0 and point[0] <= self.x1 and
+                point[1] >= self.y0 and point[1] <= self.y1)
+        
+    def contains_bbox(self, other_bbox):
+        return (self.contains_point(other_bbox.top_left) and
+                self.contains_point(other_bbox.bottom_right))
+        
+    def overlap_area(self, other_bbox):
+        x_overlap = max(0, min(self.x1, other_bbox.x1) - max(self.x0, other_bbox.x0))
+        y_overlap = max(0, min(self.y1, other_bbox.y1) - max(self.y0, other_bbox.y0))
+        return x_overlap * y_overlap
+        
+    def update(self, bbox):
+        if isinstance(bbox, BoundingBox):
+            self.x0 = bbox.x0
+            self.y0 = bbox.y0
+            self.width = bbox.width
+            self.height = bbox.height
+        elif isinstance(bbox, tuple):
+            self.x0 = bbox[0]
+            self.y0 = bbox[1]
+            self.width = bbox[2]
+            self.height = bbox[3]
+        else:
+            raise ValueError("Unknown representation of bounding box.")
+        
