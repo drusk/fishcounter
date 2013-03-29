@@ -3,7 +3,7 @@ import unittest
 from hamcrest import assert_that
 from hamcrest import equal_to
 
-from tracking import BoundingBox
+from fishcounter.tracking import BoundingBox
 
 class BBoxTest(unittest.TestCase):
 
