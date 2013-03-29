@@ -17,39 +17,20 @@ class ShapeFeatureTracker(object):
     """
     
     def __init__(self):
+        self.matcher = ShapeMatcher()
+        
         self.potential_objects = []
         self.frame_number = 0
         
         self.count = 0
         
-        # Thresholds for object similarity
-        self.centroid_threshold = 40 # Euclidean distance
-        self.area_threshold = 1750
-        self.angle_threshold = 30 # in degrees
-
     def _find_matching_objects(self, new_obj):
         matches = []
         for obj in self.tracked_objects:
-            if self.is_match(new_obj, obj):
+            if self.matcher.is_match(new_obj, obj):
                 matches.append(obj)
         return matches
     
-    def _is_centroid_match(self, obj1, obj2):
-        return (np.sqrt(np.square(obj1.center[0] - obj2.center[0]) + 
-                        np.square(obj1.center[1] - obj2.center[1]))
-                < self.centroid_threshold) 
-    
-    def _is_area_match(self, obj1, obj2):
-        return np.abs(obj1.area - obj2.area) < self.area_threshold
-    
-    def _is_angle_match(self, obj1, obj2):
-        return np.abs(obj1.angle - obj2.angle) < self.angle_threshold
-    
-    def is_match(self, obj1, obj2):
-        return (self._is_centroid_match(obj1, obj2) and 
-                self._is_area_match(obj1, obj2) and
-                self._is_angle_match(obj1, obj2))
-        
     def _prune_tracks(self):
         self._prune_short_tracks()
         self._prune_sub_tracks()
@@ -135,14 +116,14 @@ class ShapeFeatureTracker(object):
     
     def matches_known_object(self, new_obj):
         for obj in self.known_objects:
-            if self.is_match(new_obj, obj):
+            if self.matcher.is_match(new_obj, obj):
                 return True
         return False
     
     def match_potential_objects(self, new_obj):
         matches = []
         for obj in self.potential_objects:
-            if self.is_match(new_obj, obj):
+            if self.matcher.is_match(new_obj, obj):
                 matches.append(obj)
         return matches
     
@@ -172,3 +153,29 @@ class ShapeFeatureTracker(object):
         self._prune_tracks()
         
         return self.handoff_objects_of_interest()
+    
+    
+class ShapeMatcher(object):
+    
+    def __init__(self):
+        # Thresholds for object similarity
+        self.centroid_threshold = 40 # Euclidean distance
+        self.area_threshold = 1750
+        self.angle_threshold = 30 # in degrees
+    
+    def _is_centroid_match(self, obj1, obj2):
+        return (np.sqrt(np.square(obj1.center[0] - obj2.center[0]) + 
+                        np.square(obj1.center[1] - obj2.center[1]))
+                < self.centroid_threshold) 
+    
+    def _is_area_match(self, obj1, obj2):
+        return np.abs(obj1.area - obj2.area) < self.area_threshold
+    
+    def _is_angle_match(self, obj1, obj2):
+        return np.abs(obj1.angle - obj2.angle) < self.angle_threshold
+    
+    def is_match(self, obj1, obj2):
+        return (self._is_centroid_match(obj1, obj2) and 
+                self._is_area_match(obj1, obj2) and
+                self._is_angle_match(obj1, obj2))
+    
