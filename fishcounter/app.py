@@ -9,7 +9,7 @@ from segment import (CompositeSegmentationAlgorithm,
                      MovingAverageBackgroundSubtractor,
                      MixtureOfGaussiansBackgroundSubtractor,
                      HSVColourSegmenter)
-from tracking import MultistageTracker
+from tracking.multistage import MultistageTracker
 from analyzer import Analyzer
 from videoreader import VideoReader
 
