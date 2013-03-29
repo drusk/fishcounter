@@ -157,15 +157,6 @@ class ShapeFeatureTracker(object):
         self.area_threshold = 1750
         self.angle_threshold = 30 # in degrees
 
-    def draw_tracked_bounding_boxes(self, img):
-        for obj in self.tracked_objects:
-            cv2.rectangle(img, obj.bbox.top_left, obj.bbox.bottom_right, (255, 0, 0))
-#            rbbox = obj.rotated_bbox
-#            points = cv2.cv.BoxPoints(rbbox)         # Find four vertices of rectangle from above rect
-#            cv2.polylines(img,np.array([points]),True,(0,0,255),2)# draw rectangle in blue color
-        
-        cv2.imshow("Tracker", img)
-        
     def _find_matching_objects(self, new_obj):
         matches = []
         for obj in self.tracked_objects:
@@ -255,17 +246,6 @@ class ShapeFeatureTracker(object):
         for obj in obj_to_prune:
             print "Pruned high overlap object"
             self.potential_objects.remove(obj)
-    
-    def _process_leaving_objects(self):
-        leaving_objects = []
-        for obj in self.tracked_objects:
-            if not obj.is_new() and obj.is_leaving(5):
-                leaving_objects.append(obj)
-                
-        for leaving_object in leaving_objects:
-            self.tracked_objects.remove(leaving_object)
-            self.count += 1
-            print "Count: %d" % self.count
     
     def handoff_objects_of_interest(self):
         """
@@ -389,20 +369,6 @@ class TrackedObject(object):
     
     def is_new(self):
         return self.frames_tracked < 5
-    
-    def is_leaving(self, border_thickness):
-        if self.delta_area() >= 0:
-            # Must be shrinking as it goes off screen.
-            return False
-        
-        leaving_left = self.bbox.x0 < border_thickness and self.dx < 0
-        leaving_right = (self.bbox.x1 > (self.frame_width - border_thickness) and
-                         self.dx > 0)
-        leaving_top = self.bbox.y0 < border_thickness and self.dy < 0
-        leaving_bottom = (self.bbox.y1 > (self.frame_height - border_thickness) and
-                          self.dy > 0)
-        
-        return leaving_left or leaving_right or leaving_top or leaving_bottom
     
 
 class BoundingBox(object):
