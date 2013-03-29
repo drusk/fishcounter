@@ -206,7 +206,7 @@ class ShapeFeatureTracker(object):
         for potential_object in self.potential_objects:
             for known_object in self.known_objects:
                 overlap = potential_object.bbox_overlap_area(known_object) 
-                if overlap > 0.75 * known_object.bbox.area:
+                if overlap > 0.5 * known_object.bbox.area:
                     obj_to_prune.add(potential_object)
                     
         for obj in obj_to_prune:
@@ -242,7 +242,7 @@ class ShapeFeatureTracker(object):
                     # only prune the smaller objects
                     continue
                   
-                if obj.bbox_overlap_area(other_obj) > 0.75 * obj.bbox.area:
+                if obj.bbox_overlap_area(other_obj) > 0.5 * obj.bbox.area:
                     # This object is mostly overlapped with another
                     obj_to_prune.append(obj)
                     break # inner loop
