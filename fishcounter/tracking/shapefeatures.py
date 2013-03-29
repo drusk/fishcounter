@@ -22,15 +22,6 @@ class ShapeFeatureTracker(object):
         self.potential_objects = []
         self.frame_number = 0
         
-        self.count = 0
-        
-    def _find_matching_objects(self, new_obj):
-        matches = []
-        for obj in self.tracked_objects:
-            if self.matcher.is_match(new_obj, obj):
-                matches.append(obj)
-        return matches
-    
     def _prune_tracks(self):
         self._prune_short_tracks()
         self._prune_sub_tracks()
@@ -114,19 +105,6 @@ class ShapeFeatureTracker(object):
                     
         return handoff_objects
     
-    def matches_known_object(self, new_obj):
-        for obj in self.known_objects:
-            if self.matcher.is_match(new_obj, obj):
-                return True
-        return False
-    
-    def match_potential_objects(self, new_obj):
-        matches = []
-        for obj in self.potential_objects:
-            if self.matcher.is_match(new_obj, obj):
-                matches.append(obj)
-        return matches
-    
     def update(self, current_image, contours, known_objects):
         self.known_objects = known_objects
         self.frame_number += 1
@@ -139,16 +117,16 @@ class ShapeFeatureTracker(object):
             new_obj = TrackedObject(bbox, contour, self.frame_number, 
                                     frame_width, frame_height)
             
-            if self.matches_known_object(new_obj):
+            if self.matcher.has_match(new_obj, known_objects):
                 self._prune_tracks()
                 continue
             
-            matches = self.match_potential_objects(new_obj)
+            matches = self.matcher.find_matches(new_obj, self.potential_objects)
             if len(matches) == 0:
                 self.potential_objects.append(new_obj)
             else:
                 # TODO: what if there are multiple matches?
-                matches[0].update(bbox, contour, self.frame_number)
+                matches.pop().update(bbox, contour, self.frame_number)
                 
         self._prune_tracks()
         
@@ -178,4 +156,15 @@ class ShapeMatcher(object):
         return (self._is_centroid_match(obj1, obj2) and 
                 self._is_area_match(obj1, obj2) and
                 self._is_angle_match(obj1, obj2))
+        
+    def find_matches(self, target_object, search_objects):
+        matches = set()
+        for search_object in search_objects:
+            if self.is_match(target_object, search_object):
+                matches.add(search_object)
+        return matches
     
+    def has_match(self, target_object, search_objects):
+        matches = self.find_matches(target_object, search_objects)
+        return len(matches) > 0
+
