@@ -1,7 +1,8 @@
 """
 Main module of the application performing fish counting.
 """
-import sys
+
+import argparse
 
 from segment import (CompositeSegmentationAlgorithm, 
                      MovingAverageBackgroundSubtractor,
@@ -21,7 +22,12 @@ def run(video_path, skip=0):
     VideoReader(video_path, analyzer).start(skip)
 
 if __name__ == "__main__":
-    skip = 0
-    if len(sys.argv) == 2:
-        skip = int(sys.argv[1])
-    run("data/fish_video.mp4", skip)
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument("video", help="the video to analyze")
+    parser.add_argument("-s", "--skip", type=int, default=0,
+                        help="skip to start analyzing at a later frame")
+    
+    args = parser.parse_args()
+
+    run(args.video, args.skip)
