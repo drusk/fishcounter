@@ -23,6 +23,14 @@ class MultistageTracker(object):
     def count(self):
         return len(self.camshift_tracker.tracked_objects)
     
+    @property
+    def known_objects(self):
+        return self.camshift_tracker.tracked_objects
+        
+    @property
+    def potential_objects(self):
+        return self.shape_tracker.potential_objects
+    
     def update(self, current_image, contours):
         handoff_objects = self.shape_tracker.update(current_image, contours, 
                                         self.camshift_tracker.tracked_objects)
@@ -33,51 +41,6 @@ class MultistageTracker(object):
             
         self.camshift_tracker.update(current_image)
         
-        display = current_image.copy()
-        self.draw_tracked_bounding_boxes(display)
-        self.draw_counter(display)
-        cv2.imshow("Tracker", display)
-        
-    def draw_tracked_bounding_boxes(self, img):
-        min_x = 0
-        max_x = img.shape[1]
-        min_y = 0
-        max_y = img.shape[0]
-        
-        # Draw potential objects in yellow
-        for obj in self.shape_tracker.potential_objects:
-            cv2.rectangle(img, obj.bbox.top_left, obj.bbox.bottom_right, (0, 255, 255))
-        
-        # Draw 'confirmed' objects in red
-        for obj in self.camshift_tracker.tracked_objects:
-            cv2.rectangle(img, self.restrict_point(obj.bbox.top_left, min_x, max_x, min_y, max_y), 
-                          self.restrict_point(obj.bbox.bottom_right, min_x, max_x, min_y, max_y),
-                          (0, 0, 255))
-            
-    def restrict_point(self, point, min_x, max_x, min_y, max_y):
-        return (self.restrict_val(point[0], min_x, max_x), 
-                self.restrict_val(point[1], min_y, max_y))
-            
-    def restrict_val(self, val, min_val, max_val):
-        if val < min_val:
-            return min_val
-        elif val > max_val:
-            return max_val
-        else:
-            return val
-        
-    def draw_counter(self, img):
-        padding = 10
-        text_bottom_left = (padding, img.shape[0] - padding)
-
-        text = str(self.count)
-        color = (0, 255, 255)
-        fontFace = cv2.FONT_HERSHEY_SCRIPT_COMPLEX
-        fontScale = 2
-        thickness = 4
-        cv2.putText(img, text, text_bottom_left, fontFace, 
-                    fontScale, color, thickness)
-    
 
 class CamShiftTracker(object):
     """

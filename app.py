@@ -4,6 +4,7 @@ Main module of the application performing fish counting.
 
 import argparse
 
+from display import DisplayManager
 from segment import (CompositeSegmentationAlgorithm, 
                      MovingAverageBackgroundSubtractor,
                      MixtureOfGaussiansBackgroundSubtractor,
@@ -17,8 +18,9 @@ def run(video_path, skip=0):
                     MovingAverageBackgroundSubtractor(0.05),
                     MixtureOfGaussiansBackgroundSubtractor(),
                     HSVColourSegmenter()])
+    display = DisplayManager("Fish Counter")
     tracker = MultistageTracker()
-    analyzer = Analyzer(segmenter, tracker)
+    analyzer = Analyzer(segmenter, tracker, display)
     VideoReader(video_path, analyzer).start(skip)
 
 if __name__ == "__main__":
