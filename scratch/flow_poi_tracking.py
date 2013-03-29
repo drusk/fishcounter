@@ -1,3 +1,8 @@
+"""
+Uses optical flow to find fish and then discover points of interest to track
+between frames.
+"""
+
 import cv2
 import numpy as np
 

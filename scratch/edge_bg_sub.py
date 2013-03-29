@@ -1,5 +1,5 @@
 """
-Counts the number of fish that appear in a video segment.
+Experimenting with background subtraction using the edges in the images.
 """
 
 import cv2

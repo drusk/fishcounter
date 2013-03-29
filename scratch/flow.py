@@ -1,3 +1,7 @@
+"""
+Experimenting with calculating optical flow.
+"""
+
 import cv2
 from numpy import *
 
