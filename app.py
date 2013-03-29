@@ -10,7 +10,7 @@ from segment import (CompositeSegmentationAlgorithm,
                      MixtureOfGaussiansBackgroundSubtractor,
                      HSVColourSegmenter)
 from tracking import MultistageTracker
-from videoanalyzer import Analyzer
+from analyzer import Analyzer
 from videoreader import VideoReader
 
 def run(video_path, skip=0):

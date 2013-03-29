@@ -1,4 +1,6 @@
 """
+Analyzers coordinate the analysis performed by segmentation algorithms, 
+tracking algorithms, display, etc.
 """
 
 import cv2
