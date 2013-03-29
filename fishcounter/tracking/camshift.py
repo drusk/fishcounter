@@ -4,7 +4,7 @@ Tracking based on the Camshift algorithm.
 
 import cv2
 
-from segment import HSVColourSegmenter
+from fishcounter.segment import HSVColourSegmenter
 
 class CamShiftTracker(object):
     """
