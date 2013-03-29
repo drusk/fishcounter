@@ -100,6 +100,11 @@ class CamShiftTracker(object):
         
         for obj in self.tracked_objects:
             bbox = obj.bbox
+            
+            if bbox.has_negative_area:
+                print "BBOX has negative area: %s" % bbox
+                continue
+            
             hsv_roi = hsv[bbox.y0:bbox.y1, bbox.x0:bbox.x1]
             mask_roi = mask[bbox.y0:bbox.y1, bbox.x0:bbox.x1]
 
@@ -408,6 +413,11 @@ class BoundingBox(object):
         self.width = width
         self.height = height
 
+    def __str__(self):
+        return ("Top left: (%f, %f), "
+                "Bottom right: (%f, %f)" % (self.x0, self.y0, 
+                                            self.x1, self.y1))
+
     @property
     def cv2rect(self):
         """
@@ -451,6 +461,10 @@ class BoundingBox(object):
         x_overlap = max(0, min(self.x1, other_bbox.x1) - max(self.x0, other_bbox.x0))
         y_overlap = max(0, min(self.y1, other_bbox.y1) - max(self.y0, other_bbox.y0))
         return x_overlap * y_overlap
+        
+    @property
+    def has_negative_area(self):
+        return self.x0 < 0 or self.y0 < 0 or self.width < 0 or self.height < 0
         
     def update(self, bbox):
         if isinstance(bbox, BoundingBox):
