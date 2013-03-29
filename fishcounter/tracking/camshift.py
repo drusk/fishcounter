@@ -8,8 +8,8 @@ from fishcounter.segment import HSVColourSegmenter
 
 class CamShiftTracker(object):
     """
-    Example:
-    https://code.ros.org/trac/opencv/browser/trunk/opencv/samples/python2/camshift.py?rev=6588
+    Uses colour information to track fish regardless of whether they are 
+    moving or not.
     """
     
     def __init__(self):
