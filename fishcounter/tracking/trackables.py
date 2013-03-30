@@ -31,7 +31,7 @@ class TrackedObject(object):
     @property
     def angle(self):
         # raw angle seems inconsistent, can be 0 or -90 on same box
-        raw_angle =self.rotated_bbox[2] 
+        raw_angle =self.rotated_bbox[2]
         if raw_angle < -45:
             return raw_angle + 90
         else:
@@ -42,18 +42,10 @@ class TrackedObject(object):
         self.dy = self.bbox.center[1] - new_bbox.center[1]
         
         new_area = cv2.contourArea(contour)
-        if abs(self.dx) < 2 and abs(self.dy) < 2 and new_area < self.area:
-            # Object is probably stopping, and will fail to be segmented 
-            # properly in future frames.  Freeze it. 
-            self.is_frozen = True
-        else:
-            self.is_frozen = False
-            
-        if not self.is_frozen:
-            self.bbox.update(new_bbox)
-            self.prev_area = self.area
-            self.area = new_area
-            self.rotated_bbox = cv2.minAreaRect(contour)
+        self.bbox.update(new_bbox)
+        self.prev_area = self.area
+        self.area = new_area
+        self.rotated_bbox = cv2.minAreaRect(contour)
         
         self.frames_tracked += 1
         self.last_frame_tracked = frame_number
@@ -70,6 +62,9 @@ class TrackedObject(object):
     def is_new(self):
         return self.frames_tracked < 5
     
+    def is_not_moving(self):
+        return abs(self.dx) < 2 and abs(self.dy) < 2 and self.delta_area() < 0
+    
 
 class BoundingBox(object):
     
@@ -78,7 +73,7 @@ class BoundingBox(object):
         self.y0 = y0
         self.width = width
         self.height = height
-
+        
     def __str__(self):
         return ("Top left: (%f, %f), "
                 "Bottom right: (%f, %f)" % (self.x0, self.y0, 

@@ -3,6 +3,7 @@ Tracking based on the Camshift algorithm.
 """
 
 import cv2
+import numpy as np
 
 from fishcounter.segment import HSVColourSegmenter
 
@@ -19,13 +20,11 @@ class CamShiftTracker(object):
     def track(self, objects):
         self.tracked_objects.extend(objects)
 
-    def update(self, current_image):
+    def update(self, current_image, moving_objects, stationary_objects):
         hsv = cv2.cvtColor(current_image, cv2.COLOR_BGR2HSV)
         mask = self.mask_detector.segment(current_image)
         
-#        cv2.imshow("Mask", mask)
-        
-        for obj in self.tracked_objects:
+        for obj in stationary_objects:
             bbox = obj.bbox
             
             if bbox.has_negative_area:
@@ -61,5 +60,16 @@ class CamShiftTracker(object):
             # what is the difference between track_box and track_window?
             track_box, track_window = cv2.CamShift(prob, bbox.cv2rect, stop_criteria)
             
+            prev_center = bbox.center
             bbox.update(track_window)
+            new_center = bbox.center
+            
+            displacement = np.sqrt(np.square(prev_center[0] - new_center[0]) + 
+                                   np.square(prev_center[1] - new_center[1]))
+            
+            if displacement > 4:
+                stationary_objects.remove(obj)
+                moving_objects.append(obj)
 
+        return moving_objects, stationary_objects
+    

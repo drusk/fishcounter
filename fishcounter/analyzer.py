@@ -26,10 +26,12 @@ class Analyzer(object):
         
     def _display_findings(self, current_image):
         self.display.new_frame(current_image)
-        self.display.draw_bounding_boxes(self.tracker.known_objects, 
-                                         (0, 0, 255))
         self.display.draw_bounding_boxes(self.tracker.potential_objects,
                                          (0, 255, 255))
+        self.display.draw_bounding_boxes(self.tracker.moving_objects, 
+                                         (255, 0, 0))
+        self.display.draw_bounding_boxes(self.tracker.stationary_objects, 
+                                         (0, 0, 255))
         self.display.draw_counter(self.tracker.count)
 
         self.display.display_frame()

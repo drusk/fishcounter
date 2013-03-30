@@ -3,40 +3,46 @@ Multistage tracking utilizing different tracking algorithms for different
 phases of detecting and tracking.
 """
 
+import utils
 from shapefeatures import ShapeFeatureTracker
 from camshift import CamShiftTracker
 
 class MultistageTracker(object):
     """
-    Use ShapeFeatureTracker to find the initial objects until they have been 
-    tracked long enough to be considered objects of interest.  Then let
-    the CamShiftTracker take over so we can handle when they stop moving.
-    Increment counter once the handover has taken place.
+    Use ShapeFeatureTracker to track moving objects (including detection of 
+    new objects) and CamshiftTracker to track stationary objects.
     """
     
     def __init__(self):
         self.shape_tracker = ShapeFeatureTracker()
         self.camshift_tracker = CamShiftTracker()
+        
+        self.potential_objects = []
+        self.moving_objects = []
+        self.stationary_objects = []
     
     @property
     def count(self):
-        return len(self.camshift_tracker.tracked_objects)
+        return len(self.known_objects)
     
     @property
     def known_objects(self):
-        return self.camshift_tracker.tracked_objects
-        
-    @property
-    def potential_objects(self):
-        return self.shape_tracker.potential_objects
+        return utils.join_lists(self.moving_objects, self.stationary_objects)
     
     def update(self, current_image, contours):
-        handoff_objects = self.shape_tracker.update(current_image, contours, 
-                                        self.camshift_tracker.tracked_objects)
+        # Handle moving objects
+        potential, moving, stationary = self.shape_tracker.update(current_image, contours, 
+                                                                  self.potential_objects, 
+                                                                  self.moving_objects,
+                                                                  self.stationary_objects)
+        self.potential_objects = potential
+        self.moving_objects = moving
+        self.stationary_objects = stationary
         
-        if handoff_objects:
-            self.camshift_tracker.track(handoff_objects)
-            print "Fish count: %d" % self.count
-            
-        self.camshift_tracker.update(current_image)
-
+        # Handle stationary objects
+        moving, stationary = self.camshift_tracker.update(current_image,
+                                                          self.moving_objects,
+                                                          self.stationary_objects)
+        self.moving_objects = moving
+        self.stationary_objects = stationary
+        

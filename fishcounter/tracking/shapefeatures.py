@@ -5,6 +5,7 @@ Tracking based on shape features.
 import cv2
 import numpy as np
 
+import utils
 from trackables import TrackedObject, BoundingBox
 from pruning import Pruner
 
@@ -21,11 +22,12 @@ class ShapeFeatureTracker(object):
         self.matcher = ShapeMatcher()
         self.pruner = Pruner()
         
-        self.potential_objects = []
         self.frame_number = 0
     
-    def update(self, current_image, contours, known_objects):
-        self.known_objects = known_objects
+    def update(self, current_image, contours, potential_objects, moving_objects, stationary_objects):
+        all_moving_objects = utils.join_lists(potential_objects, moving_objects)
+        known_objects = utils.join_lists(moving_objects, stationary_objects)
+        
         self.frame_number += 1
         
         frame_height, frame_width = current_image.shape[:2]
@@ -36,59 +38,48 @@ class ShapeFeatureTracker(object):
             new_obj = TrackedObject(bbox, contour, self.frame_number, 
                                     frame_width, frame_height)
             
-            if self.matcher.has_match(new_obj, known_objects):
-                self._prune_tracks()
+            if self.matcher.has_match(new_obj, stationary_objects):
                 continue
             
-            matches = self.matcher.find_matches(new_obj, self.potential_objects)
+            matches = self.matcher.find_matches(new_obj, all_moving_objects)
             if len(matches) == 0:
-                self.potential_objects.append(new_obj)
+                potential_objects.append(new_obj)
             else:
-                # TODO: what if there are multiple matches?
+                # TODO: what if there are multiple matches? Find closest match
                 matches.pop().update(bbox, contour, self.frame_number)
+        
+        # Prune spurious potential objects
+        potential_objects = self.pruner.prune_inactive(potential_objects, 
+                                                       self.frame_number)
+        potential_objects = self.pruner.prune_subsumed(potential_objects, 
+                                                       known_objects)
+        potential_objects = self.pruner.prune_high_overlap(potential_objects, 
+                                                           known_objects)
+        potential_objects = self.pruner.prune_super_objects(potential_objects, 
+                                                            known_objects)
+        
+        # Identify the potential objects that we are now confident are legitimate
+        confirmed_objs = [obj for obj in potential_objects if not obj.is_new()]
+        for obj in confirmed_objs:
+            potential_objects.remove(obj)
+            moving_objects.append(obj)
                 
-        self._prune_tracks()
+        # Find objects that were moving but have stopped
+        stopped_objs = [obj for obj in moving_objects if obj.is_not_moving()]
+        for obj in stopped_objs:
+            moving_objects.remove(obj)
+            stationary_objects.append(obj)
         
-        return self.handoff_objects_of_interest()
-
-    def handoff_objects_of_interest(self):
-        """
-        After we have tracked an object for a while, we become more certain 
-        it is one of the objects of interest.  Hand it off to the next 
-        tracker.
-        """
-        handoff_objects = []
-        for obj in self.potential_objects:
-            if not obj.is_new():
-                handoff_objects.append(obj)
-        
-        for obj in handoff_objects:
-            self.potential_objects.remove(obj)
-                    
-        return handoff_objects
-
-    def _prune_tracks(self):
-        self.potential_objects = self.pruner.prune_inactive(
-                                                self.potential_objects, 
-                                                self.frame_number)
-        self.potential_objects = self.pruner.prune_subsumed(
-                                                self.potential_objects,
-                                                self.known_objects)
-        self.potential_objects = self.pruner.prune_high_overlap(
-                                                self.potential_objects,
-                                                self.known_objects)
-        self.potential_objects = self.pruner.prune_super_objects(
-                                                self.potential_objects,
-                                                self.known_objects)
+        return potential_objects, moving_objects, stationary_objects 
     
     
 class ShapeMatcher(object):
     
     def __init__(self):
         # Thresholds for object similarity
-        self.centroid_threshold = 40 # Euclidean distance
-        self.area_threshold = 1750
-        self.angle_threshold = 30 # in degrees
+        self.centroid_threshold = 30 # Euclidean distance
+        self.area_threshold = 2000
+        self.angle_threshold = 45 # in degrees
     
     def _is_centroid_match(self, obj1, obj2):
         return (np.sqrt(np.square(obj1.center[0] - obj2.center[0]) + 
