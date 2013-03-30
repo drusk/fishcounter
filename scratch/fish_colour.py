@@ -31,6 +31,9 @@ def hsv_test(img):
 if __name__ == "__main__":
     img = cv2.imread("data/fish_ss.png")
     hsv_test(img)
-    
+#    
     shadow_img = cv2.imread("data/fish_and_shadow.jpg")
     hsv_test(shadow_img)
+
+    well_lit_img = cv2.imread("data/fish_well_lit.jpg")
+    hsv_test(well_lit_img)
