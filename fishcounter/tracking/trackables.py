@@ -65,6 +65,17 @@ class TrackedObject(object):
     def is_not_moving(self):
         return abs(self.dx) < 2 and abs(self.dy) < 2 and self.delta_area() < 0
     
+    def is_near_edge(self):
+        padding = 0.2
+        min_x = self.frame_width * padding
+        width = self.frame_width * (1 - 2*padding)
+        min_y = self.frame_height * padding
+        height = self.frame_height * (1 - 2*padding)
+        
+        center_bbox = BoundingBox(min_x, min_y, width, height)
+        
+        return not center_bbox.contains_point(self.center)
+    
 
 class BoundingBox(object):
     

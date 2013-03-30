@@ -39,7 +39,8 @@ class ShapeFeatureTracker(object):
             
             matches = self.matcher.find_matches(new_obj, all_moving_objects)
             if len(matches) == 0:
-                potential_objects.append(new_obj)
+                if new_obj.is_near_edge():
+                    potential_objects.append(new_obj)
             else:
                 # TODO: should we only update closest match?
                 for match in matches:
