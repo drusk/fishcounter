@@ -22,20 +22,16 @@ class ShapeFeatureTracker(object):
         self.matcher = ShapeMatcher()
         self.pruner = Pruner()
         
-        self.frame_number = 0
-    
-    def update(self, current_image, contours, potential_objects, moving_objects, stationary_objects):
+    def update(self, current_image, frame_number, contours, potential_objects, moving_objects, stationary_objects):
         all_moving_objects = utils.join_lists(potential_objects, moving_objects)
         known_objects = utils.join_lists(moving_objects, stationary_objects)
-        
-        self.frame_number += 1
         
         frame_height, frame_width = current_image.shape[:2]
         
         for contour in contours:
             bounding_rect = cv2.boundingRect(contour)
             bbox = BoundingBox(*bounding_rect)
-            new_obj = TrackedObject(bbox, contour, self.frame_number, 
+            new_obj = TrackedObject(bbox, contour, frame_number, 
                                     frame_width, frame_height)
             
             if self.matcher.has_match(new_obj, stationary_objects):
@@ -46,11 +42,11 @@ class ShapeFeatureTracker(object):
                 potential_objects.append(new_obj)
             else:
                 # TODO: what if there are multiple matches? Find closest match
-                matches.pop().update(bbox, contour, self.frame_number)
+                matches.pop().update(bbox, contour, frame_number)
         
         # Prune spurious potential objects
         potential_objects = self.pruner.prune_inactive(potential_objects, 
-                                                       self.frame_number)
+                                                       frame_number)
         potential_objects = self.pruner.prune_subsumed(potential_objects, 
                                                        known_objects)
         potential_objects = self.pruner.prune_high_overlap(potential_objects, 

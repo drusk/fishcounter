@@ -20,7 +20,7 @@ class CamShiftTracker(object):
     def track(self, objects):
         self.tracked_objects.extend(objects)
 
-    def update(self, current_image, moving_objects, stationary_objects):
+    def update(self, current_image, frame_number, moving_objects, stationary_objects):
         hsv = cv2.cvtColor(current_image, cv2.COLOR_BGR2HSV)
         mask = self.mask_detector.segment(current_image)
         
@@ -62,6 +62,7 @@ class CamShiftTracker(object):
             
             prev_center = bbox.center
             bbox.update(track_window)
+            obj.last_frame_tracked = frame_number
             new_center = bbox.center
             
             displacement = np.sqrt(np.square(prev_center[0] - new_center[0]) + 
