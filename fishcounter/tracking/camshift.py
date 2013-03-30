@@ -68,7 +68,7 @@ class CamShiftTracker(object):
             displacement = np.sqrt(np.square(prev_center[0] - new_center[0]) + 
                                    np.square(prev_center[1] - new_center[1]))
             
-            if displacement > 4:
+            if displacement > 6:
                 stationary_objects.remove(obj)
                 moving_objects.append(obj)
 
