@@ -41,8 +41,9 @@ class ShapeFeatureTracker(object):
             if len(matches) == 0:
                 potential_objects.append(new_obj)
             else:
-                # TODO: what if there are multiple matches? Find closest match
-                matches.pop().update(bbox, contour, frame_number)
+                # TODO: should we only update closest match?
+                for match in matches:
+                    match.update(bbox, contour, frame_number)
         
         # Prune spurious potential objects
         potential_objects = self.pruner.prune_inactive(potential_objects, 
