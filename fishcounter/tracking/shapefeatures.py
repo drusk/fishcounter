@@ -18,92 +18,10 @@ class ShapeFeatureTracker(object):
     
     def __init__(self):
         self.matcher = ShapeMatcher()
+        self.pruner = Pruner()
         
         self.potential_objects = []
         self.frame_number = 0
-        
-    def _prune_tracks(self):
-        self._prune_short_tracks()
-        self._prune_sub_tracks()
-        self._prune_high_overlap_tracks()
-        self._prune_super_tracks()
-        
-    def _prune_short_tracks(self):
-        obj_to_prune = []
-        for obj in self.potential_objects:
-            if (obj.is_new() and
-                obj.last_frame_tracked < self.frame_number):
-                obj_to_prune.append(obj)
-                
-        for obj in obj_to_prune:
-            print "Pruned short track"
-            self.potential_objects.remove(obj)
-            
-    def _prune_super_tracks(self):
-        obj_to_prune = set()
-        for potential_object in self.potential_objects:
-            for known_object in self.known_objects:
-                overlap = potential_object.bbox_overlap_area(known_object) 
-                if overlap > 0.5 * known_object.bbox.area:
-                    obj_to_prune.add(potential_object)
-                    
-        for obj in obj_to_prune:
-            print "Pruned super track"
-            self.potential_objects.remove(obj)
-            
-    def _get_other_objects(self, obj):
-        other_objs = list(self.known_objects)
-        other_objs.extend(self.potential_objects)
-        other_objs.remove(obj)
-        return other_objs
-            
-    def _prune_sub_tracks(self):
-        sub_tracks = []
-        for obj in self.potential_objects:
-            for other_obj in self._get_other_objects(obj):
-                if other_obj.contains(obj):
-                    sub_tracks.append(obj)
-                    break # inner loop
-                
-        for obj in sub_tracks:
-            print "Pruned sub track"
-            self.potential_objects.remove(obj)
-    
-    def _prune_high_overlap_tracks(self):
-        obj_to_prune = []
-        for obj in self.potential_objects:
-            for other_obj in self._get_other_objects(obj):
-                if other_obj.is_new():
-                    continue
-
-                if obj.bbox.area > other_obj.bbox.area:
-                    # only prune the smaller objects
-                    continue
-                  
-                if obj.bbox_overlap_area(other_obj) > 0.5 * obj.bbox.area:
-                    # This object is mostly overlapped with another
-                    obj_to_prune.append(obj)
-                    break # inner loop
-                
-        for obj in obj_to_prune:
-            print "Pruned high overlap object"
-            self.potential_objects.remove(obj)
-    
-    def handoff_objects_of_interest(self):
-        """
-        After we have tracked an object for a while, we become more certain 
-        it is one of the objects of interest.  Hand it off to the next 
-        tracker.
-        """
-        handoff_objects = []
-        for obj in self.potential_objects:
-            if not obj.is_new():
-                handoff_objects.append(obj)
-        
-        for obj in handoff_objects:
-            self.potential_objects.remove(obj)
-                    
-        return handoff_objects
     
     def update(self, current_image, contours, known_objects):
         self.known_objects = known_objects
@@ -131,6 +49,36 @@ class ShapeFeatureTracker(object):
         self._prune_tracks()
         
         return self.handoff_objects_of_interest()
+
+    def handoff_objects_of_interest(self):
+        """
+        After we have tracked an object for a while, we become more certain 
+        it is one of the objects of interest.  Hand it off to the next 
+        tracker.
+        """
+        handoff_objects = []
+        for obj in self.potential_objects:
+            if not obj.is_new():
+                handoff_objects.append(obj)
+        
+        for obj in handoff_objects:
+            self.potential_objects.remove(obj)
+                    
+        return handoff_objects
+
+    def _prune_tracks(self):
+        self.potential_objects = self.pruner.prune_inactive(
+                                                self.potential_objects, 
+                                                self.frame_number)
+        self.potential_objects = self.pruner.prune_subsumed(
+                                                self.potential_objects,
+                                                self.known_objects)
+        self.potential_objects = self.pruner.prune_high_overlap(
+                                                self.potential_objects,
+                                                self.known_objects)
+        self.potential_objects = self.pruner.prune_super_objects(
+                                                self.potential_objects,
+                                                self.known_objects)
     
     
 class ShapeMatcher(object):
@@ -167,4 +115,70 @@ class ShapeMatcher(object):
     def has_match(self, target_object, search_objects):
         matches = self.find_matches(target_object, search_objects)
         return len(matches) > 0
+
+
+class Pruner(object):
+    
+    def _get_others(self, excluded_obj, others1, others2):
+        all_others = list(others1)
+        all_others.extend(others2)
+        all_others.remove(excluded_obj)
+        return all_others
+    
+    def prune_inactive(self, tracked_objects, current_frame_number):
+        
+        def is_active(tracked_object):
+            return tracked_object.last_frame_tracked == current_frame_number
+        
+        return filter(is_active, tracked_objects)
+
+    def prune_subsumed(self, pruneable_objects, other_objects):
+        sub_tracks = []
+        for obj in pruneable_objects:
+            for other_obj in self._get_others(obj, pruneable_objects, other_objects):
+                if other_obj.contains(obj):
+                    sub_tracks.append(obj)
+                    break
+        
+        for obj in sub_tracks:
+            print "Pruned subsumed"
+            pruneable_objects.remove(obj)
+            
+        return pruneable_objects
+    
+    def prune_high_overlap(self, pruneable_objects, other_objects):
+        obj_to_prune = []
+        for obj in pruneable_objects:
+            for other_obj in self._get_others(obj, pruneable_objects, other_objects):
+                if other_obj.is_new():
+                    continue
+
+                if obj.bbox.area > other_obj.bbox.area:
+                    # only prune the smaller objects
+                    continue
+                  
+                if obj.bbox_overlap_area(other_obj) > 0.5 * obj.bbox.area:
+                    # This object is mostly overlapped with another
+                    obj_to_prune.append(obj)
+                    break # inner loop
+        
+        for obj in obj_to_prune:
+            print "Pruned high overlap"
+            pruneable_objects.remove(obj)
+            
+        return pruneable_objects
+    
+    def prune_super_objects(self, pruneable_objects, other_objects):
+        obj_to_prune = set()
+        for obj in pruneable_objects:
+            for other_obj in other_objects:
+                overlap = obj.bbox_overlap_area(other_obj) 
+                if overlap > 0.5 * other_obj.bbox.area:
+                    obj_to_prune.add(obj)
+                    
+        for obj in obj_to_prune:
+            print "Pruned super track"
+            pruneable_objects.remove(obj)
+            
+        return pruneable_objects
 
