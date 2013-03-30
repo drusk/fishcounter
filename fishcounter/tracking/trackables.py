@@ -60,7 +60,7 @@ class TrackedObject(object):
         return self.bbox.overlap_area(other_obj.bbox)
     
     def is_new(self):
-        return self.frames_tracked < 5
+        return self.frames_tracked < 15
     
     def is_not_moving(self):
         return abs(self.dx) < 2 and abs(self.dy) < 2 and self.delta_area() < 0
