@@ -77,8 +77,8 @@ class ShapeMatcher(object):
     
     def __init__(self):
         # Thresholds for object similarity
-        self.centroid_threshold = 30 # Euclidean distance
-        self.area_threshold = 2000
+        self.centroid_threshold = 50 # Euclidean distance
+        self.area_threshold = 0.40 # the percent difference
         self.angle_threshold = 45 # in degrees
     
     def _is_centroid_match(self, obj1, obj2):
@@ -87,7 +87,10 @@ class ShapeMatcher(object):
                 < self.centroid_threshold) 
     
     def _is_area_match(self, obj1, obj2):
-        return np.abs(obj1.area - obj2.area) < self.area_threshold
+        max_area = max(obj1.area, obj2.area)
+        min_area = min(obj1.area, obj2.area)
+        return (abs(max_area - min_area) / max_area) < self.area_threshold  
+#        return np.abs(obj1.area - obj2.area) < self.area_threshold
     
     def _is_angle_match(self, obj1, obj2):
         return np.abs(obj1.angle - obj2.angle) < self.angle_threshold
