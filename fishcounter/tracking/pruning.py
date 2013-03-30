@@ -10,10 +10,11 @@ class Pruner(object):
         all_others.remove(excluded_obj)
         return all_others
     
-    def prune_inactive(self, tracked_objects, current_frame_number):
+    def prune_inactive(self, tracked_objects, current_frame_number, inactive_frames=1):
         
         def is_active(tracked_object):
-            return tracked_object.last_frame_tracked == current_frame_number
+            return (tracked_object.last_frame_tracked >
+                    current_frame_number - inactive_frames)
         
         return filter(is_active, tracked_objects)
 
