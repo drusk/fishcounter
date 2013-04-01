@@ -18,7 +18,7 @@ class Analyzer(object):
         segmented = self.segmenter.segment(current_image)
         
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        contours = find_connected_components(segmented, kernel, 200)
+        contours = find_connected_components(segmented, kernel, 150)
         
         self.tracker.update(current_image, contours)
 

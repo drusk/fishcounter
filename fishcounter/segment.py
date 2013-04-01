@@ -15,7 +15,8 @@ class HSVColourSegmenter(object):
         #   Saturation range: [0, 255]
         #   Value range:      [0, 255]
         # This is not the same as programs like gcolor2!
-        self.hue_min = 75
+        #self.hue_min = 75
+        self.hue_min = 70
         self.hue_max = 100
         self.sat_min = 0.
         self.sat_max = 100
