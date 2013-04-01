@@ -57,7 +57,7 @@ class CamShiftTracker(object):
                              1 # desired accuracy of window center 
                              )
 
-            # what is the difference between track_box and track_window?
+            # track_box also contains rotation information which we are not using right now
             track_box, track_window = cv2.CamShift(prob, bbox.cv2rect, stop_criteria)
             
             prev_center = bbox.center
