@@ -53,7 +53,7 @@ class CamShiftTracker(object):
             prob &= mask
             
             stop_criteria = (cv2.TERM_CRITERIA_COUNT | cv2.TERM_CRITERIA_EPS, 
-                             10, # max iterationsstop when window center shifts less than this distance
+                             10, # max iterations
                              1 # desired accuracy of window center 
                              )
 
