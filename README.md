@@ -9,3 +9,5 @@ Usage:
 ------
 
   ```python app.py <video file>```
+  
+There is an example video in the ```data``` folder called ```fish_video.mp4``` which can be used to try it out.
