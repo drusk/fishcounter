@@ -14,12 +14,8 @@ class CamShiftTracker(object):
     """
     
     def __init__(self):
-        self.tracked_objects = []
         self.mask_detector = HSVColourSegmenter()
         
-    def track(self, objects):
-        self.tracked_objects.extend(objects)
-
     def update(self, current_image, frame_number, moving_objects, stationary_objects):
         hsv = cv2.cvtColor(current_image, cv2.COLOR_BGR2HSV)
         mask = self.mask_detector.segment(current_image)
