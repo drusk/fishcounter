@@ -21,7 +21,7 @@ class Analyzer(object):
         # TODO an algorithm to dynamically set threshold
         contours = find_connected_components(segmented, kernel, 200)
         
-        self.tracker.update(current_image, contours)
+        self.tracker.track(current_image, contours)
 
         self._display_findings(current_image)
         

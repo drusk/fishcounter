@@ -33,11 +33,11 @@ class MultistageTracker(object):
     def known_objects(self):
         return utils.join_lists(self.moving_objects, self.stationary_objects)
     
-    def update(self, current_image, contours):
+    def track(self, current_image, contours):
         self.frame_number += 1
         
         # Handle moving objects
-        potential, moving, stationary = self.shape_tracker.update(current_image, 
+        potential, moving, stationary = self.shape_tracker.track(current_image,
                                                                   self.frame_number,
                                                                   contours, 
                                                                   self.potential_objects, 
@@ -48,7 +48,7 @@ class MultistageTracker(object):
         self.stationary_objects = stationary
         
         # Handle stationary objects
-        moving, stationary = self.camshift_tracker.update(current_image,
+        moving, stationary = self.camshift_tracker.track(current_image,
                                                           self.frame_number,
                                                           self.moving_objects,
                                                           self.stationary_objects)

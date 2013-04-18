@@ -22,7 +22,7 @@ class ShapeFeatureTracker(object):
         self.matcher = ShapeMatcher()
         self.pruner = Pruner()
         
-    def update(self, current_image, frame_number, contours, potential_objects, moving_objects, stationary_objects):
+    def track(self, current_image, frame_number, contours, potential_objects, moving_objects, stationary_objects):
         all_moving_objects = utils.join_lists(potential_objects, moving_objects)
         known_objects = utils.join_lists(moving_objects, stationary_objects)
         
