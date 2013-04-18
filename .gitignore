@@ -1,3 +1,4 @@
 *.pyc
 profiling/
 data/fish[0-9]*.mp4
+.idea/
