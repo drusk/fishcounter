@@ -18,7 +18,8 @@ class Analyzer(object):
         segmented = self.segmenter.segment(current_image)
         
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        contours = find_connected_components(segmented, kernel, 150)
+        # TODO an algorithm to dynamically set threshold
+        contours = find_connected_components(segmented, kernel, 200)
         
         self.tracker.update(current_image, contours)
 
