@@ -122,8 +122,8 @@ class BoundingBox(object):
         return self.width * self.height
 
     def contains_point(self, point):
-        return (point[0] >= self.x0 and point[0] <= self.x1 and
-                point[1] >= self.y0 and point[1] <= self.y1)
+        return (self.x0 <= point[0] <= self.x1 and
+                self.y0 <= point[1] <= self.y1)
         
     def contains_bbox(self, other_bbox):
         return (self.contains_point(other_bbox.top_left) and
