@@ -33,6 +33,7 @@ from fishcounter.tracking.multistage import MultistageTracker
 from fishcounter.analyzer import Analyzer
 from fishcounter.videoreader import VideoReader
 
+
 def run(video_path, skip=0):
     segmenter = CompositeSegmentationAlgorithm([
         MovingAverageBackgroundSubtractor(0.05),
@@ -42,6 +43,7 @@ def run(video_path, skip=0):
     tracker = MultistageTracker()
     analyzer = Analyzer(segmenter, tracker, display)
     VideoReader(video_path, analyzer).start(skip)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -24,27 +24,28 @@ Read and process video files.
 
 import cv2
 
+
 class VideoReader(object):
     """
     Reads a video file and analyzes each frame with a specified video 
     analyzer.
     """
-    
+
     def __init__(self, video_path, video_analyzer):
         self.capture = cv2.VideoCapture(video_path)
         self.video_analyzer = video_analyzer
-        
+
     def start(self, skip=0):
         frame_was_read, current_image = self.capture.read()
-        
+
         while frame_was_read:
             previous_image = current_image
             frame_was_read, current_image = self.capture.read()
-            
+
             if skip > 0:
                 skip -= 1
                 continue
-            
+
             self.video_analyzer.analyze(previous_image, current_image)
 
             # Exit if user presses the Escape key
@@ -56,10 +57,10 @@ class FrameDisplayAnalyzer(object):
     """
     A video analyzer which does nothing but display the current frame.
     """
-    
+
     def analyze(self, previous_image, current_image):
         cv2.imshow("Frame", current_image)
-    
+
 
 if __name__ == "__main__":
     VideoReader("data/fish_video.mp4", FrameDisplayAnalyzer()).start(skip=500)
